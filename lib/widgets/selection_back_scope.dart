@@ -30,18 +30,24 @@ class _SelectionBackScopeState extends State<SelectionBackScope> {
     final registry = SelectionBackRegistry.maybeOf(context);
     if (!identical(registry, _registry)) {
       _registry?._active.remove(this);
+      _registry?._changed();
       _registry = registry;
     }
+    final wasActive = registry?.hasActiveSelection ?? false;
     if (intercept) {
       registry?._active.add(this);
     } else {
       registry?._active.remove(this);
+    }
+    if (wasActive != (registry?.hasActiveSelection ?? false)) {
+      registry?._changed();
     }
   }
 
   @override
   void dispose() {
     _registry?._active.remove(this);
+    _registry?._changed();
     _registry = null;
     super.dispose();
   }
@@ -63,6 +69,18 @@ class _SelectionBackScopeState extends State<SelectionBackScope> {
 
 /// 뒤로가기를 "선택 취소"로 가로채는 [SelectionBackScope] 목록. 화면 State 가 한 번 만들어 들고 있는다.
 class SelectionBackController {
+  SelectionBackController({this.onChanged});
+  final ValueChanged<bool>? onChanged;
+  bool _scheduled = false;
+  void _changed() {
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      onChanged?.call(hasActiveSelection);
+    });
+  }
+
   final Set<Object> _active = <Object>{};
 
   /// 지금 뒤로가기를 가로채는(보이는 탭에서 선택 중인) 범위가 있는가.

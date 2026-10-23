@@ -188,7 +188,7 @@ void main() {
     testWidgets('알림 하위 탭(읽지 않은 배지) ×$scale', (tester) async {
       final errors = await _pump(tester, const NotificationsScreen(), scale);
       expect(_tabBarErrors(errors), isEmpty, reason: describeErrors(errors));
-      _expectFullLabels(tester, ['크롤링 현황', '신고 결과', '별점 주기'], scale);
+      _expectFullLabels(tester, ['동기화', '신고 결과', '별점'], scale);
     });
   }
 }

@@ -343,12 +343,7 @@ class MainActivity : FlutterFragmentActivity() {
         return appMode == "standalone" && username.isNotBlank() && !isDemoMode
     }
 
-    private fun isConfiguredServer(): Boolean {
-        val appMode = flutterStringPref(PREF_APP_MODE)
-        val baseUrl = flutterStringPref(PREF_BASE_URL)
-        val apiKey = flutterStringPref(PREF_API_KEY)
-        return appMode != "standalone" && baseUrl.isNotBlank() && apiKey.isNotBlank()
-    }
+    private fun isConfiguredServer(): Boolean = false
 
     private fun flutterStringPref(key: String): String {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(key, "") ?: ""

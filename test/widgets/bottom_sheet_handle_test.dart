@@ -73,12 +73,22 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets(
-      'report detail sheet draws exactly one drag handle (${brightness.name})',
+      'report detail opens a full-height route with Back (${brightness.name})',
       (tester) async {
         final ctx = await _host(tester, brightness);
         showReportDetailSheet(ctx, _report());
         await tester.pumpAndSettle();
-        expect(_handleCount(tester), 1);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(BackButton), findsOneWidget);
+        expect(
+          tester
+              .widget<ReportDetailSheet>(find.byType(ReportDetailSheet))
+              .fullPage,
+          isTrue,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(ReportDetailSheet), findsNothing);
       },
     );
   }
@@ -118,7 +128,10 @@ void main() {
 
   testWidgets('sheets take the corner radius from the theme', (tester) async {
     final ctx = await _host(tester, Brightness.light);
-    showReportDetailSheet(ctx, _report());
+    showDuplicateGroupDetailSheet(
+      ctx,
+      DuplicateGroup.fromJson({'group_id': 'g1', 'members': const []}),
+    );
     await tester.pumpAndSettle();
     final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
     expect(sheet.shape, isNull, reason: '시트마다 모서리를 따로 주지 않는다');

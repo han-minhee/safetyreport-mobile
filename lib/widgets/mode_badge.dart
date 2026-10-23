@@ -13,6 +13,7 @@ class ModeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (mode == AppMode.standalone && !isDemo) return const SizedBox.shrink();
     final sr = context.sr;
     final isStandalone = mode == AppMode.standalone;
     final base = isStandalone ? sr.modeStandalone : sr.modeClient;
@@ -21,9 +22,7 @@ class ModeBadge extends StatelessWidget {
       brightness: Theme.of(context).brightness,
       surface: sr.background,
     );
-    final label = isStandalone
-        ? (isDemo ? 'Standalone · 데모' : 'Standalone')
-        : 'Client';
+    final label = isStandalone ? (isDemo ? '데모' : 'Standalone') : 'Client';
     return Semantics(
       label: '실행 모드 $label',
       excludeSemantics: true,

@@ -114,7 +114,7 @@ class ReportListCard extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -133,41 +133,55 @@ class ReportListCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            report.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14.5,
-                              height: 1.3,
-                              color: sr.textPrimary,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final title = Text(
+                          report.name,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            height: 1.4,
+                            color: sr.textPrimary,
+                          ),
+                        );
+                        final badges = Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            StatusBadge.status(report.status),
+                            ?headerSuffix,
+                          ],
+                        );
+                        if (constraints.maxWidth < 280 ||
+                            MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
+                            headerSuffix != null) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              title,
+                              const SizedBox(height: 8),
+                              badges,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: title),
+                            const SizedBox(width: 12),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 110),
+                              child: badges,
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 110),
-                          child: StatusBadge.status(report.status),
-                        ),
-                        if (headerSuffix != null) ...[
-                          const SizedBox(width: 6),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 96),
-                            child: headerSuffix!,
-                          ),
-                        ],
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.tag, size: 13, color: sr.textSecondary),
-                        const SizedBox(width: 3),
                         Flexible(
                           child: Text(
                             report.reportNumber,
@@ -184,7 +198,7 @@ class ReportListCard extends StatelessWidget {
                         if (report.supplementCount > 0) ...[
                           const SizedBox(width: 6),
                           StatusBadge(
-                            label: '보완횟수:${report.supplementCount}회',
+                            label: '보완 ${report.supplementCount}회',
                             color: serverSupplementColor,
                             fontSize: SrFontSize.caption,
                           ),
@@ -216,7 +230,7 @@ class ReportListCard extends StatelessWidget {
                         ],
                       ),
                     ],
-                    Divider(height: 16, color: sr.border),
+                    const SizedBox(height: 12),
                     _MetaAndCarNumber(
                       metaItems: visibleMetaItems,
                       carNumber: report.carNumber,
@@ -267,7 +281,9 @@ class _MetaAndCarNumber extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final chipWidth = _CarNumberChip.intrinsicWidth(context, carNumber);
-        final besideMeta = chipWidth <= constraints.maxWidth * _chipMaxFraction;
+        final besideMeta =
+            MediaQuery.textScalerOf(context).scale(1) <= 1.3 &&
+            chipWidth <= constraints.maxWidth * _chipMaxFraction;
         if (besideMeta) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -306,7 +322,11 @@ class _MetaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sr = context.sr;
-    final baseStyle = TextStyle(color: sr.textSecondary, fontSize: 12);
+    final baseStyle = TextStyle(
+      color: sr.textSecondary,
+      fontSize: 13,
+      height: 1.4,
+    );
     final hasSecondary = secondaryText != null && secondaryText!.isNotEmpty;
     final textWidget = hasSecondary
         ? Text.rich(
@@ -320,9 +340,9 @@ class _MetaRow extends StatelessWidget {
               ],
             ),
             style: baseStyle,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
           )
-        : Text(text, style: baseStyle, overflow: TextOverflow.ellipsis);
+        : Text(text, style: baseStyle, softWrap: true);
 
     final row = Row(
       children: [

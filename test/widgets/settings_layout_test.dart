@@ -146,10 +146,25 @@ void main() {
       expectSectionOrder(tester);
       expectInSection(tester, find.text('서버 연결'), 'connection');
       expectInSection(tester, find.text('백그라운드 서버 연결'), 'connection');
-      expectInSection(tester, find.text('DB 백업 (다운로드)'), 'data');
-      expect(find.textContaining('Android 10 이상: Download/mysafetyreport/'), findsOneWidget);
-      expect(find.textContaining('Android 7~9: 저장할 위치를 직접 선택합니다.'), findsOneWidget);
-      expect(find.textContaining('저장 경로: Documents/mysafetyreport/'), findsNothing);
+      expectInSection(tester, find.text('DB 백업'), 'data');
+      expect(
+        find.textContaining('Android 10 이상: Download/mysafetyreport/'),
+        findsNothing,
+      );
+      await tester.tap(find.text('백업 저장 위치'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Android 10 이상: Download/mysafetyreport/'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Android 7~9: 저장할 위치를 직접 선택합니다.'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('저장 경로: Documents/mysafetyreport/'),
+        findsNothing,
+      );
       expectInSection(tester, find.text('파일 관리 (서버 파일)'), 'data');
       expectInSection(tester, find.text('크롤링 자동 저장'), 'data');
       expectInSection(tester, find.text('화면 테마'), 'display');
@@ -159,13 +174,10 @@ void main() {
       // 버그 제보(도움·문의)는 맨 위: 연결 방식 카드 바로 아래, 서버 연결 카드보다 위(2026-09-24 결정).
       expectInSection(tester, find.text('도움·문의'), 'connection');
       expect(
-        topOf(tester, find.text('버그 제보하기')),
+        topOf(tester, find.text('버그 제보')),
         lessThan(topOf(tester, find.text('서버 연결'))),
       );
-      expect(
-        topOf(tester, find.text('버그 제보하기')),
-        greaterThan(topOf(tester, find.text('변경'))),
-      );
+      expect(find.text('변경'), findsNothing, reason: 'mode switching removed');
       expectInSection(tester, find.text('앱 정보'), 'about');
       expect(find.text('안전신문고 계정'), findsNothing);
     }, () => selfhostMockClient((_) async => ok(<String, Object>{})));
@@ -200,7 +212,7 @@ void main() {
     addTearDown(provider.dispose);
     await pumpSettings(tester, provider);
 
-    expect(find.text('버그 제보하기'), findsOneWidget);
+    expect(find.text('버그 제보'), findsOneWidget);
     expect(find.text('기타 데이터 필터 세팅'), findsNothing);
     expect(find.text('목록·통계 기준'), findsWidgets);
 
@@ -216,13 +228,13 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: infoCard, matching: find.text('안전신문고 공식 사이트 열기')),
+      find.descendant(of: infoCard, matching: find.text('공식 사이트 열기')),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: infoCard,
-        matching: find.textContaining('이 앱은 안전신문고의 공식 앱이 아니며'),
+        matching: find.textContaining('안전신문고 비공식 앱이며'),
       ),
       findsOneWidget,
     );

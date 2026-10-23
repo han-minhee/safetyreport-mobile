@@ -63,7 +63,7 @@ class _OfficialAccountStartState extends State<OfficialAccountStartScreen> {
           ),
           body: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -174,12 +174,12 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
         if (!_isStandalone) return;
         if (context.read<ReportProvider>().isStandaloneDemo) {
           if (messenger != null) {
-            showSrSnackOn(messenger, '데모 모드에서는 동기화를 실행할 수 없습니다.');
+            showSrSnackOn(messenger, '데모에서는 동기화할 수 없습니다.');
           }
           return;
         }
         if (SyncEngine.isRunning || _isRunning) {
-          if (messenger != null) showSrSnackOn(messenger, '이미 동기화가 진행 중입니다.');
+          if (messenger != null) showSrSnackOn(messenger, '동기화 중입니다.');
           return;
         }
         await _startSync(fullSync: false);
@@ -187,7 +187,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
       case 'quick_crawl':
         if (_isStandalone) return;
         if (_isRunning) {
-          if (messenger != null) showSrSnackOn(messenger, '이미 크롤링이 진행 중입니다.');
+          if (messenger != null) showSrSnackOn(messenger, '크롤링 중입니다.');
           return;
         }
         await _startCrawl();
@@ -572,9 +572,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('데이터 동기화'),
-        actions: [
-          const SettingsActionButton(),
-        ],
+        actions: [const SettingsActionButton()],
       ),
       body: _withLogPanel(
         // 상태 카드는 내용 높이만 쓰고 남는 세로 공간은 로그 창이 받는다.
@@ -681,7 +679,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: context.sr.textPrimary,
                   ),
                 ),
               ],
@@ -733,10 +731,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
             ),
             SizedBox(width: 12),
             const Expanded(
-              child: Text(
-                '현재 Demo 보기 모드입니다. 동기화 없이 가상 신고 100건을 표시합니다.',
-                style: TextStyle(height: 1.5),
-              ),
+              child: Text('데모 신고 100건 · 동기화 없음', style: TextStyle(height: 1.5)),
             ),
           ],
         ),
@@ -829,9 +824,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('크롤링 제어'),
-        actions: [
-          const SettingsActionButton(),
-        ],
+        actions: [const SettingsActionButton()],
       ),
       body: _withLogPanel(
         // 크롤링 중에는 제어 영역을 줄이고(넘치면 스크롤) 로그 창을 넓힌다.
@@ -990,7 +983,7 @@ class CrawlScreenState extends State<CrawlScreen> with WidgetsBindingObserver {
       text,
       style: TextStyle(
         fontWeight: FontWeight.bold,
-        fontSize: 13,
+        fontSize: 20,
         color: Theme.of(context).colorScheme.primary,
       ),
     ),

@@ -13,16 +13,16 @@ class ClientGateRenewalTest {
             if (method.name == "getString") raw else error("unexpected call")
         } as SharedPreferences
     }
-    @Test fun expiredGateRequiresRefreshButDoesNotMeanRevocation() {
+    @Test fun expiredLegacyGateCannotRenewInStandaloneOnlyApp() {
         val p = prefs("ok", 601_000)
         assertFalse(ClientGateGuard.isOpen(p))
-        assertTrue(ClientGateGuard.canRenew(p))
+        assertFalse(ClientGateGuard.canRenew(p))
     }
     @Test fun explicitDenialAndMissingOwnerCannotKeepWebsocketAlive() {
         assertFalse(ClientGateGuard.canRenew(prefs("consent_required", 0)))
         assertFalse(ClientGateGuard.canRenew(prefs("ok", 601_000, "")))
     }
-    @Test fun freshlyVerifiedGateCanSend() {
-        assertTrue(ClientGateGuard.isOpen(prefs("ok", 100)))
+    @Test fun evenFreshLegacyGateCannotSendInStandaloneOnlyApp() {
+        assertFalse(ClientGateGuard.isOpen(prefs("ok", 100)))
     }
 }

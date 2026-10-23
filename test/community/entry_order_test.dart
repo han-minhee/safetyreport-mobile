@@ -1,3 +1,4 @@
+import 'package:safetyreport/widgets/sr_navigation.dart';
 // 진입 순서·게이트 가드 — F01·F05·F06·F12·F18, S-21 순서.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -150,14 +151,7 @@ void main() {
       addTearDown(gate.dispose);
       await tester.pumpWidget(_app(provider, gate));
       await tester.pumpAndSettle();
-      tester
-          .widget<InkWell>(
-            find.ancestor(
-              of: find.text('Standalone 모드'),
-              matching: find.byType(InkWell),
-            ),
-          )
-          .onTap!();
+
       await tester.pumpAndSettle();
       // Play 심사 자격을 게이트 전에 입력할 수 있어야 한다. 일반 자격은
       // 로그인 API·대기 가져오기를 시작하기 전에 기존 온보딩으로 이동한다.
@@ -186,7 +180,7 @@ void main() {
       await tester.pumpWidget(_app(provider, gate));
       await tester.pumpAndSettle();
       expect(find.byType(SetupScreen), findsOneWidget);
-      expect(find.text('Demo 보기'), findsOneWidget);
+      expect(find.text('데모 보기'), findsOneWidget);
       expect(find.byType(PermissionScreen), findsNothing);
       expect(find.byType(MainNavigationScreen), findsNothing);
       expect(
@@ -194,27 +188,21 @@ void main() {
         isEmpty,
         reason: '게이트 전 PermissionScreen·OS 권한 요청 호출 0',
       );
-      tester
-          .widget<InkWell>(
-            find.ancestor(
-              of: find.text('Client 모드'),
-              matching: find.byType(InkWell),
-            ),
-          )
-          .onTap!();
+      await tester.ensureVisible(find.text('로그인'));
+      await tester.tap(find.text('로그인'));
       await tester.pumpAndSettle();
       expect(find.byType(CommunityOnboardingScreen), findsOneWidget);
       expect(find.byType(PermissionScreen), findsNothing);
       tester
           .widget<IconButton>(
             find.ancestor(
-              of: find.byTooltip('모드 선택으로 돌아가기'),
+              of: find.byTooltip('처음으로'),
               matching: find.byType(IconButton),
             ),
           )
           .onPressed!();
       await tester.pumpAndSettle();
-      expect(find.text('Demo 보기'), findsOneWidget);
+      expect(find.text('데모 보기'), findsOneWidget);
     },
   );
 
@@ -258,14 +246,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SetupScreen), findsOneWidget);
     expect(find.byType(PermissionScreen), findsNothing);
-    tester
-        .widget<InkWell>(
-          find.ancestor(
-            of: find.text('Client 모드'),
-            matching: find.byType(InkWell),
-          ),
-        )
-        .onTap!();
+    await tester.ensureVisible(find.text('로그인'));
+    await tester.tap(find.text('로그인'));
     await tester.pumpAndSettle();
     expect(find.byType(PermissionScreen), findsOneWidget);
     expect(
@@ -274,22 +256,14 @@ void main() {
     );
     expect(find.text('백그라운드 서버 연결 (WebSocket)'), findsNothing);
     // common 완료 → 선택한 Client 설정 화면.
-    final later = find.widgetWithText(FilledButton, '나중에 설정하기');
+    final later = find.widgetWithText(FilledButton, '나중에');
     await tester.ensureVisible(later);
     await tester.pumpAndSettle();
     tester.widget<FilledButton>(later).onPressed!();
     await tester.pumpAndSettle();
     expect(find.byType(SetupScreen), findsOneWidget);
-    expect(find.text('서버 연결 설정'), findsOneWidget);
-    await provider.setConfig('http://127.0.0.1:9', 'k');
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(
-      find.byType(PermissionScreen),
-      findsNothing,
-      reason: '서버 설정을 저장한 뒤 권한 화면이 다시 열리면 안 된다',
-    );
+    expect(find.text('안전신문고 로그인'), findsOneWidget);
+    expect(find.text('서버 연결 설정'), findsNothing);
   });
 
   testWidgets(
@@ -463,7 +437,7 @@ void main() {
       expect(find.byType(PermissionScreen), findsNothing);
       expect(find.byType(SetupScreen), findsNothing);
       expect(
-        communityNavAllowed(tester.element(find.byType(NavigationBar))),
+        communityNavAllowed(tester.element(find.byType(SrNavigation))),
         isTrue,
       );
       expect(serviceStarts, 0);
@@ -511,7 +485,7 @@ void main() {
     );
     await pumpMain(tester);
     expect(
-      communityNavAllowed(tester.element(find.byType(NavigationBar))),
+      communityNavAllowed(tester.element(find.byType(SrNavigation))),
       isTrue,
     );
     await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -524,7 +498,10 @@ void main() {
         );
     await pumpMain(tester);
     expect(
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      tester
+          .widget<SrNavigation>(find.byType(SrNavigation))
+          .destination
+          .legacyTab,
       4,
     );
     // DashboardScreen 의 fetchSummary 5초 타임아웃 등 잔여 타이머를 비운다.
@@ -553,8 +530,9 @@ void main() {
     );
     await pumpMain(tester);
     final before = tester
-        .widget<NavigationBar>(find.byType(NavigationBar))
-        .selectedIndex;
+        .widget<SrNavigation>(find.byType(SrNavigation))
+        .destination
+        .legacyTab;
     await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .handlePlatformMessage(
           'com.fentanest.mysafetyreport/permissions',
@@ -565,12 +543,15 @@ void main() {
         );
     await pumpMain(tester);
     expect(
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      tester
+          .widget<SrNavigation>(find.byType(SrNavigation))
+          .destination
+          .legacyTab,
       before,
       reason: '게이트 미충족이면 알림 탭 이동 무시',
     );
     expect(
-      communityNavAllowed(tester.element(find.byType(NavigationBar))),
+      communityNavAllowed(tester.element(find.byType(SrNavigation))),
       isFalse,
     );
     await tester.pump(const Duration(seconds: 6));

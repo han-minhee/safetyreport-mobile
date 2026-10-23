@@ -13,7 +13,8 @@ import 'package:safetyreport/navigation/native_call_router.dart';
 import 'package:safetyreport/providers/notification_history_provider.dart';
 import 'package:safetyreport/providers/report_provider.dart';
 import 'package:safetyreport/screens/dashboard_screen.dart';
-import 'package:safetyreport/screens/report_management_screen.dart';
+import 'package:safetyreport/screens/reports_workspace.dart';
+import 'package:safetyreport/widgets/sr_navigation.dart';
 import 'package:safetyreport/services/app_prefs_keys.dart';
 import 'package:safetyreport/services/standalone_auth_service.dart';
 import 'package:safetyreport/theme/app_theme.dart';
@@ -110,8 +111,10 @@ void main() {
     return provider;
   }
 
-  int selectedTab(WidgetTester tester) =>
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+  int selectedTab(WidgetTester tester) => tester
+      .widget<SrNavigation>(find.byType(SrNavigation))
+      .destination
+      .legacyTab;
 
   Future<void> drainTimers(WidgetTester tester) async {
     await tester.pump(const Duration(seconds: 6));
@@ -122,7 +125,7 @@ void main() {
     'U05: non-dashboard tab back goes to dashboard, dashboard back exits',
     (tester) async {
       await pumpMain(tester);
-      for (final label in ['알림', '통계', '신고관리', '신고내역']) {
+      for (final label in ['활동', '통계', '신고']) {
         await tester.tap(find.text(label).last);
         await settle(tester);
         expect(selectedTab(tester), isNot(0));
@@ -146,7 +149,7 @@ void main() {
       await pumpMain(tester);
       await tester.tap(find.text('통계').last);
       await settle(tester);
-      Navigator.of(tester.element(find.byType(NavigationBar))).push(
+      Navigator.of(tester.element(find.byType(SrNavigation))).push(
         MaterialPageRoute<void>(
           builder: (_) => const Scaffold(body: Text('pushed')),
         ),
@@ -193,31 +196,53 @@ void main() {
     await tester.tap(manage);
     await settle(tester);
 
-    expect(selectedTab(tester), 2);
+    expect(find.byType(ManagementToolScreen), findsOneWidget);
     expect(
-      Navigator.of(tester.element(find.byType(NavigationBar))).canPop(),
-      isFalse,
-      reason: '하단 탭 없는 신고관리 화면을 새로 쌓지 않는다',
+      tester
+          .widget<ManagementToolScreen>(find.byType(ManagementToolScreen))
+          .index,
+      1,
     );
-    expect(find.byType(ReportManagementScreen), findsOneWidget);
-    final tabBar = tester.widget<TabBar>(
-      find.descendant(
-        of: find.byType(ReportManagementScreen),
-        matching: find.byType(TabBar),
-      ),
-    );
-    expect(tabBar.controller!.index, 1, reason: '감시 목록 하위 탭');
-
-    // 하위 탭을 바꾼 뒤 다시 "관리"로 오면 다시 감시 목록이다.
-    tabBar.controller!.index = 3;
-    await tester.tap(find.text('대시보드').last);
+    await tester.binding.handlePopRoute();
     await settle(tester);
-    await tester.tap(manage);
-    await settle(tester);
-    expect(selectedTab(tester), 2);
-    expect(tabBar.controller!.index, 1);
+    expect(selectedTab(tester), 1);
+    expect(find.text('신고 관리'), findsOneWidget);
     await drainTimers(tester);
   });
+
+  testWidgets(
+    'legacy management deep link opens tool without changing activity filter',
+    (tester) async {
+      NativeCallRouter.instance.resetForTest();
+      addTearDown(NativeCallRouter.instance.resetForTest);
+      NativeCallRouter.instance.install();
+      await pumpMain(tester);
+      final history = tester
+          .element(find.byType(SrNavigation))
+          .read<NotificationHistoryProvider>();
+      history.setPreferredTabIndex(2);
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            'com.fentanest.mysafetyreport/permissions',
+            const StandardMethodCodec().encodeMethodCall(
+              const MethodCall('navigateToTab', {'tab': 2, 'sub_tab': 1}),
+            ),
+            (_) {},
+          );
+      await settle(tester);
+      expect(history.preferredTabIndex, 2);
+      expect(
+        tester
+            .widget<ManagementToolScreen>(find.byType(ManagementToolScreen))
+            .index,
+        1,
+      );
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+      expect(selectedTab(tester), 1);
+      await drainTimers(tester);
+    },
+  );
 
   testWidgets(
     'B05: navigateToTab sent before the main screen exists opens the tab',

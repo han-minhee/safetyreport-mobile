@@ -153,7 +153,7 @@ class _PermissionScreenState extends State<PermissionScreen>
 
     return SingleChildScrollView(
       // 시스템 바 여백(SQ-U26).
-      padding: srPagePadding(context, const EdgeInsets.all(20)),
+      padding: srPagePadding(context, const EdgeInsets.all(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -163,9 +163,7 @@ class _PermissionScreenState extends State<PermissionScreen>
             decoration: BoxDecoration(
               color: context.tone(SrTone.primary).background,
               borderRadius: BorderRadius.circular(SrRadius.lg),
-              border: Border.all(
-                color: context.tone(SrTone.primary).border,
-              ),
+              border: Border.all(color: context.tone(SrTone.primary).border),
             ),
             child: Row(
               children: [
@@ -176,7 +174,7 @@ class _PermissionScreenState extends State<PermissionScreen>
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    '카카오톡·안전신문고 알림에서 신고번호를 자동 감지하고,\n크롤링 완료 결과를 알림으로 받으려면\n아래 권한이 모두 필요합니다.',
+                    '신고 알림 자동 감지와 동기화 결과 알림에 필요합니다.',
                     style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                 ),
@@ -193,8 +191,7 @@ class _PermissionScreenState extends State<PermissionScreen>
               _PermCard(
                 icon: Icons.notifications_active,
                 title: '알림 접근 권한',
-                desc:
-                    '카카오톡·안전신문고 알림에서 신고번호를 자동으로 감지합니다.\n시스템 설정에서 직접 허용해야 합니다.',
+                desc: '카카오톡·안전신문고의 신고번호 감지. 시스템 설정에서 허용해 주세요.',
                 granted: _listenerEnabled,
                 grantedLabel: '활성화됨',
                 deniedLabel: '허용 안 됨',
@@ -210,7 +207,7 @@ class _PermissionScreenState extends State<PermissionScreen>
               _PermCard(
                 icon: Icons.battery_full,
                 title: '배터리 최적화 제외',
-                desc: '백그라운드에서 알림을 지속적으로 감지하려면\n배터리 최적화에서 제외되어야 합니다.',
+                desc: '백그라운드 알림 감지를 위해 최적화에서 제외해 주세요.',
                 granted: _batteryIgnored,
                 grantedLabel: '제외됨',
                 deniedLabel: '최적화 대상',
@@ -225,7 +222,7 @@ class _PermissionScreenState extends State<PermissionScreen>
             _PermCard(
               icon: Icons.circle_notifications,
               title: '알림 표시 권한 (Android 13+)',
-              desc: '크롤링 완료 후 처리 결과를 팝업 알림으로 받으려면\n알림 표시 권한이 필요합니다.',
+              desc: '동기화 결과 알림 표시',
               granted: _notifGranted,
               grantedLabel: '허용됨',
               deniedLabel: '거부됨',
@@ -239,8 +236,7 @@ class _PermissionScreenState extends State<PermissionScreen>
             _PermCard(
               icon: Icons.my_location,
               title: '위치 권한 (선택)',
-              desc:
-                  '신고 지도에서 GPS로 현재 위치를 표시하는 선택 권한입니다.\n허용하지 않아도 나머지 기능은 정상 동작하며, 지도의 현재 위치 버튼을 누를 때 다시 요청합니다.',
+              desc: '선택 권한 · 지도에서 내 위치를 표시합니다. 거부해도 다른 기능은 사용할 수 있습니다.',
               granted: _locationGranted,
               grantedLabel: '허용됨',
               deniedLabel: '미허용',
@@ -296,7 +292,7 @@ class _PermissionScreenState extends State<PermissionScreen>
                       ),
                     )
                   : Icon(Icons.shield_outlined, size: 18),
-              label: const Text('모든 권한 한 번에 허용하기'),
+              label: const Text('권한 설정'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -331,9 +327,7 @@ class _PermissionScreenState extends State<PermissionScreen>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _allGranted
-                        ? '필수 권한이 모두 허용되었습니다. 알림 자동 처리가 활성화됩니다.'
-                        : '일부 권한이 허용되지 않아 자동 알림 기능이 제한될 수 있습니다.',
+                    _allGranted ? '알림 자동 처리 준비 완료' : '권한 부족으로 알림 자동 처리가 제한됩니다.',
                     style: TextStyle(
                       fontSize: 13,
                       color: _allGranted
@@ -364,7 +358,7 @@ class _PermissionScreenState extends State<PermissionScreen>
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              child: Text(_allGranted ? '완료' : '나중에 설정하기'),
+              child: Text(_allGranted ? '완료' : '나중에'),
             ),
           ],
           const SizedBox(height: 12),

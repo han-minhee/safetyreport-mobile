@@ -176,7 +176,9 @@ void main() {
     },
   );
 
-  testWidgets('cloud page has no retry button and never polls every second', (tester) async {
+  testWidgets('cloud page has no retry button and never polls every second', (
+    tester,
+  ) async {
     final g = gate(mode: 'server');
     server.statusFailures = 10;
     await tester.runAsync(g.refreshNow);
@@ -301,16 +303,8 @@ void main() {
     );
     expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, isFalse);
     expect(find.text('Demo 보기'), findsNothing);
-    expect(
-      tester
-          .widget<IconButton>(
-            find.byWidgetPredicate(
-              (w) => w is IconButton && w.tooltip == '모드 선택으로 돌아가기',
-            ),
-          )
-          .onPressed,
-      isNull,
-    );
+    expect(find.byTooltip('모드 선택으로 돌아가기'), findsNothing);
+    expect(find.text('데모 보기'), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('안전신문고 로그인'), findsOneWidget);

@@ -4,7 +4,26 @@ import 'package:flutter/material.dart';
 import '../widgets/selection_back_scope.dart';
 import '../widgets/sync_exit_guard.dart';
 
-/// 하단 5개 탭 인덱스(PROJECT_RULES: 0~4 고정). 네이티브 딥링크의 옛 5(파일)·6(동기화/크롤링)은 [AppRoutes] 가 연다.
+/// Four visible destinations; legacy native IDs are retained below.
+enum AppDestination {
+  home('홈', Icons.home_outlined, 0),
+  reports('신고', Icons.article_outlined, 1),
+  insights('통계', Icons.insights_outlined, 3),
+  activity('활동', Icons.notifications_outlined, 4);
+
+  const AppDestination(this.label, this.icon, this.legacyTab);
+  final String label;
+  final IconData icon;
+  final int legacyTab;
+  static AppDestination fromLegacy(int tab) => switch (tab) {
+    0 => home,
+    1 || 2 => reports,
+    3 => insights,
+    _ => activity,
+  };
+}
+
+/// Stable native protocol IDs. These are NOT positions in the four-item dock.
 abstract final class MainTabs {
   static const dashboard = 0;
   static const reports = 1;
@@ -30,9 +49,15 @@ class MainTabController extends ChangeNotifier {
 
   /// 하단 탭 [tab] 으로 바꾸고, [subTab] 이 있으면 그 탭 화면의 하위 탭을 고른다.
   void goTo(int tab, {int? subTab}) {
-    if (subTab != null) _pendingSubTabs[tab] = subTab;
+    if (tab == MainTabs.reports) _pendingSubTabs.remove(MainTabs.management);
+    if (tab == MainTabs.management) _pendingSubTabs.remove(MainTabs.reports);
+    if (tab == MainTabs.management ||
+        tab == MainTabs.reports ||
+        subTab != null) {
+      _pendingSubTabs[tab] = subTab ?? 0;
+    }
     _onSelectTab(tab);
-    if (subTab != null) notifyListeners();
+    notifyListeners();
   }
 
   /// [tab] 화면이 받을 하위 탭 요청을 꺼낸다(한 번만).
@@ -69,8 +94,10 @@ class MainTabBackScope extends StatefulWidget {
     required this.onReturnHome,
     required this.child,
     this.running,
+    this.onSelectionChanged,
   });
 
+  final ValueChanged<bool>? onSelectionChanged;
   final int currentIndex;
   final VoidCallback onReturnHome;
   final Widget child;
@@ -83,7 +110,11 @@ class MainTabBackScope extends StatefulWidget {
 }
 
 class _MainTabBackScopeState extends State<MainTabBackScope> {
-  final SelectionBackController _selection = SelectionBackController();
+  late final SelectionBackController _selection = SelectionBackController(
+    onChanged: (active) {
+      if (mounted) widget.onSelectionChanged?.call(active);
+    },
+  );
 
   bool _onBackBlocked() {
     if (_selection.hasActiveSelection) return true;

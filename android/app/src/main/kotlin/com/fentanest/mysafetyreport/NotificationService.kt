@@ -26,6 +26,7 @@ class NotificationService : NotificationListenerService() {
         try {
             val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
             val standalone = prefs.getString("flutter.appMode", "server") == "standalone"
+            if (!standalone) return
             if (standalone && prefs.getBoolean("flutter.standaloneDemoMode", false)) return
             val prefix = if (standalone) PrefsInbox.QUEUE else PrefsInbox.ENQUEUE
             val inbox = ProcessingInboxStore.get(this)

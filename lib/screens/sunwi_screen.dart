@@ -663,11 +663,7 @@ class _SunwiSectionState extends State<SunwiSection>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(SrRadius.xl),
         border: Border.all(color: context.sr.border),
-        gradient: LinearGradient(
-          colors: [context.sr.surface, context.sr.surfaceAlt],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        color: context.sr.surface,
       ),
       child: Row(
         children: [

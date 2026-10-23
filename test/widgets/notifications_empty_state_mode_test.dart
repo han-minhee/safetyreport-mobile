@@ -47,7 +47,7 @@ void main() {
     tester,
   ) async {
     await _pump(tester, AppMode.standalone);
-    expect(find.text('크롤링 현황'), findsOneWidget);
+    expect(find.text('동기화'), findsOneWidget);
     expect(find.text('동기화 알림이 없습니다.'), findsOneWidget);
     expect(find.text('크롤링 알림이 없습니다.'), findsNothing);
     expect(find.textContaining('크롤링 시작/완료'), findsNothing);

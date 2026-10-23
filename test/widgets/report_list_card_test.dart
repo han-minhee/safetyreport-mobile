@@ -75,7 +75,7 @@ void main() {
     expect(find.text(report.name), findsOneWidget);
     expect(find.text(report.status), findsOneWidget);
     expect(find.text(report.reportNumber), findsOneWidget);
-    expect(find.text('보완횟수:2회'), findsOneWidget);
+    expect(find.text('보완 2회'), findsOneWidget);
     expect(find.textContaining('보완 요청자:'), findsOneWidget);
     expect(find.text(report.carNumber), findsOneWidget);
     expect(find.text(report.agency), findsOneWidget);

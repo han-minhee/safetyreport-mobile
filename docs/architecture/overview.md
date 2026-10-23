@@ -1,5 +1,16 @@
 # 개요·화면 구조·앱 흐름
 
+## 코드 대조 정정 — Standalone 전용 구성
+
+앱 진입점 `main()`은 `ReportProvider.standaloneOnly()`만 생성한다. 기존 기본 생성자는 마이그레이션/계약 회귀 테스트용 어댑터이며 배포 앱에서 사용하지 않는다. 실행 모드 enum과 서버 DB 변환 코드는 기존 파일 호환을 위해 남는다.
+
+`StandaloneInstallation.prepare`는 Client 설정을 Standalone으로 전환하고, 이전 직접 로그인 아이디/전화번호는 `legacy_client_` 키로 보존한 뒤 활성 자격에서 제외한다. 서버 URL/키, 대기 파일 가져오기, 개인 DB 및 커뮤니티 데이터는 삭제하거나 네트워크로 전송하지 않는다. 기존 Standalone 계정과 데모는 변경하지 않는다. 로그인·계정 소유권 확인 후에만 동기화가 가능하다.
+
+서버 재활성화는 production Provider의 `setConfig`에서 거절한다. Kotlin ClientGateGuard는 기존 서버 작업의 admission/renewal을 거절하고, 서버 바로가기를 생성하지 않는다. NotificationWork 및 Dart 알림 엔진도 Standalone 설정만 처리한다. 앱 업데이트 후 첫 Flutter 실행 전에도 서버 작업이 실행되지 않도록 네이티브에서 차단한다. 이전 서버 큐는 지우거나 Standalone 큐로 옮기지 않는다.
+
+이하 양쪽 모드 설명은 호환 코드의 구조 기록이다. 현재 사용자 진입점은 Standalone만 제공한다.
+
+
 > 이관 원본: 루트 `CLAUDE.md` (sha256 `32e8f475…9481`, 마지막 변경 커밋 `161b68dc`), 2026-09-24 분할.
 > 본문은 원문을 **그대로** 옮겼다. 코드와 달라진 부분은 아래 "코드 대조 정정"에만 적고 원문은 고치지 않았다.
 > 원본 전체 사본: [legacy-claude-reference.md](legacy-claude-reference.md) · 제목별 대응표: [README.md](README.md)

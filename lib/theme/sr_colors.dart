@@ -74,13 +74,13 @@ class SrColors extends ThemeExtension<SrColors> {
   static const logPanel = Color(0xFF1E1E1E);
 
   static const light = SrColors(
-    background: Color(0xFFF8FAFC),
+    background: Color(0xFFF5F5F7),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF1F5F9),
-    border: Color(0xFFE2E8F0),
-    textPrimary: Color(0xFF0F172A),
-    textSecondary: Color(0xFF64748B),
-    textDisabled: Color(0xFF94A3B8),
+    surfaceAlt: Color(0xFFF0F0F2),
+    border: Color(0xFFE3E3E8),
+    textPrimary: Color(0xFF1D1D1F),
+    textSecondary: Color(0xFF626269),
+    textDisabled: Color(0xFF8A8A92),
     brand: Color(0xFF0D6EFD),
     brandSoft: Color(0xFFE7F1FF),
     modeClient: Color(0xFF0D6EFD),

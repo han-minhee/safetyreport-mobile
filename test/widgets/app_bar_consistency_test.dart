@@ -134,11 +134,10 @@ void main() {
     await settle(tester);
 
     const tabs = <String, Type>{
-      '대시보드': DashboardScreen,
-      '신고내역': ReportListScreen,
-      '신고관리': ReportManagementScreen,
+      '홈': DashboardScreen,
+      '신고': ReportListScreen,
       '통계': StatisticsScreen,
-      '알림': NotificationsScreen,
+      '활동': NotificationsScreen,
     };
     for (final MapEntry(key: label, value: screen) in tabs.entries) {
       await tester.tap(find.text(label).last);
@@ -156,7 +155,11 @@ void main() {
         reason: '$label 앱바의 설정은 한 개',
       );
       if (screen != DashboardScreen) {
-        expect(titleOf(bar), label, reason: '제목은 하단 탭 이름과 같다');
+        expect(
+          titleOf(bar),
+          screen == ReportListScreen ? '신고내역' : label,
+          reason: '제목은 하단 탭 이름과 같다',
+        );
       }
       final settings = find.descendant(
         of: find.byType(screen),

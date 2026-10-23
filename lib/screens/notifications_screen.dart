@@ -413,7 +413,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return Scaffold(
       appBar: AppBar(
         // 제목은 하단 탭 이름과 같게, 설정은 맨 끝(SQ-U16).
-        title: const Text('알림'),
+        title: const Text('활동'),
         actions: [
           if (allItems.isNotEmpty && provider.unreadCount > 0)
             TextButton.icon(
@@ -436,27 +436,26 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         bottom: SrTabBar(
           controller: _tabController,
           textScaler: MediaQuery.textScalerOf(context),
-          labels: const ['크롤링 현황', '신고 결과', '별점 주기'],
+          labels: [isStandalone ? '동기화' : '크롤링 현황', '신고 결과', '별점'],
           badgeCounts: [crawlUnread, reportUnread, ratingUnread],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // 하위 탭 이름 "크롤링 현황"은 불변 항목이라 그대로 두고, 빈 상태 문구만 모드에 맞춘다(SQ-U08).
+          // 기존 알림 분류와 저장된 기록은 유지한다.
           // Standalone 동기화는 이 탭에 시작/완료 기록을 남기지 않고, 바뀐 신고만 "신고 결과" 탭에 남긴다.
           _buildGenericList(
             items: crawlItems,
             emptyMessage: isStandalone ? '동기화 알림이 없습니다.' : '크롤링 알림이 없습니다.',
             emptySubMessage: isStandalone
-                ? '동기화로 바뀐 신고는 "신고 결과" 탭에 기록됩니다.'
+                ? '변경된 신고는 "신고 결과"에서 확인하세요.'
                 : '크롤링 시작/완료 알림이 여기에 기록됩니다.',
           ),
           _buildGenericList(
             items: reportItems,
             emptyMessage: '신고 결과가 없습니다.',
-            emptySubMessage:
-                '${isStandalone ? '동기화' : '크롤링'} 후 변경된 신고건과 중복 신고 변경이 여기에 기록됩니다.\n각 항목을 눌러 상세 정보를 확인하세요.',
+            emptySubMessage: '${isStandalone ? '동기화' : '크롤링'}로 변경된 신고·중복 신고',
           ),
           _buildRatingList(ratingItems),
         ],
@@ -490,9 +489,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: items.length,
-        separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final item = items[index];
           return _NotifTile(
@@ -514,7 +513,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
@@ -570,111 +569,119 @@ class _NotifTile extends StatelessWidget {
         ? ''
         : (item.extraData?['범칙금_과태료']?.toString() ?? '').trim();
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 5, right: 10),
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: unread
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.transparent,
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(SrRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 5, right: 10),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: unread
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.transparent,
+                  ),
                 ),
               ),
-            ),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isDuplicate
-                    ? context.toneOf(changeDuplicateColor).background
-                    : hasDetail
-                    ? context.tone(SrTone.warning).background
-                    : context.tone(SrTone.primary).background,
-                borderRadius: BorderRadius.circular(SrRadius.lg),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDuplicate
+                      ? context.toneOf(changeDuplicateColor).background
+                      : hasDetail
+                      ? context.tone(SrTone.warning).background
+                      : context.tone(SrTone.primary).background,
+                  borderRadius: BorderRadius.circular(SrRadius.lg),
+                ),
+                child: Icon(
+                  isDuplicate
+                      ? Icons.content_copy_outlined
+                      : hasDetail
+                      ? Icons.assignment_outlined
+                      : Icons.notifications_active,
+                  color: isDuplicate
+                      ? context.toneOf(changeDuplicateColor).foreground
+                      : hasDetail
+                      ? context.tone(SrTone.warning).foreground
+                      : context.tone(SrTone.primary).foreground,
+                  size: 20,
+                ),
               ),
-              child: Icon(
-                isDuplicate
-                    ? Icons.content_copy_outlined
-                    : hasDetail
-                    ? Icons.assignment_outlined
-                    : Icons.notifications_active,
-                color: isDuplicate
-                    ? context.toneOf(changeDuplicateColor).foreground
-                    : hasDetail
-                    ? context.tone(SrTone.warning).foreground
-                    : context.tone(SrTone.primary).foreground,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: unread ? FontWeight.bold : FontWeight.w500,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: unread ? FontWeight.bold : FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.sr.textSecondary,
-                      height: 1.4,
+                    const SizedBox(height: 3),
+                    Text(
+                      item.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: context.sr.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
-                  if (hasDetail && (status.isNotEmpty || fine.isNotEmpty)) ...[
-                    const SizedBox(height: 6),
+                    if (hasDetail &&
+                        (status.isNotEmpty || fine.isNotEmpty)) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          if (status.isNotEmpty)
+                            _miniChip(
+                              status,
+                              isDuplicate
+                                  ? changeDuplicateColor
+                                  : _statusColor(status),
+                            ),
+                          if (fine.isNotEmpty && fine != 'null')
+                            _miniChip(
+                              fine.split(':').first.trim(),
+                              _fineColor(context, fine),
+                            ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    // 신고번호·시각은 폭이 모자라면 다음 줄로 넘긴다(L-3: 360dp·2.0배에서 Row 가 넘쳤다).
                     Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
+                      spacing: 8,
+                      runSpacing: 2,
                       children: [
-                        if (status.isNotEmpty)
-                          _miniChip(
-                            status,
-                            isDuplicate
-                                ? changeDuplicateColor
-                                : _statusColor(status),
-                          ),
-                        if (fine.isNotEmpty && fine != 'null')
-                          _miniChip(
-                            fine.split(':').first.trim(),
-                            _fineColor(context, fine),
-                          ),
+                        if (item.reportNumber.isNotEmpty)
+                          _metaChip(context, Icons.tag, item.reportNumber),
+                        _metaChip(context, Icons.access_time, item.timestamp),
                       ],
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  // 신고번호·시각은 폭이 모자라면 다음 줄로 넘긴다(L-3: 360dp·2.0배에서 Row 가 넘쳤다).
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 2,
-                    children: [
-                      if (item.reportNumber.isNotEmpty)
-                        _metaChip(context, Icons.tag, item.reportNumber),
-                      _metaChip(context, Icons.access_time, item.timestamp),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, size: 16, color: context.sr.textDisabled),
-          ],
+              Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: context.sr.textDisabled,
+              ),
+            ],
+          ),
         ),
       ),
     );

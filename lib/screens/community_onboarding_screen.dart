@@ -99,10 +99,13 @@ class _CommunityOnboardingScreenState extends State<CommunityOnboardingScreen> {
     try {
       final token = await _auth.getAccessToken();
       if (token == null || token.isEmpty) {
-        final unavailable = _auth.state.value.phase == CommunityAccountPhase.connected;
+        final unavailable =
+            _auth.state.value.phase == CommunityAccountPhase.connected;
         throw CommunityAccountError(
           code: unavailable ? 'cloud_unavailable' : 'kakao_required',
-          message: unavailable ? '서버 연결이 지연되고 있습니다. 잠시 후 자동으로 확인합니다.' : '먼저 카카오 인증을 완료해 주세요.',
+          message: unavailable
+              ? '서버 연결이 지연되고 있습니다. 잠시 후 자동으로 확인합니다.'
+              : '먼저 카카오 인증을 완료해 주세요.',
           transient: unavailable,
         );
       }
@@ -170,10 +173,13 @@ class _CommunityOnboardingScreenState extends State<CommunityOnboardingScreen> {
       }
       final token = await _auth.getAccessToken();
       if (token == null || token.isEmpty) {
-        final unavailable = _auth.state.value.phase == CommunityAccountPhase.connected;
+        final unavailable =
+            _auth.state.value.phase == CommunityAccountPhase.connected;
         throw CommunityAccountError(
           code: unavailable ? 'cloud_unavailable' : 'kakao_required',
-          message: unavailable ? '서버 연결이 지연되고 있습니다. 잠시 후 자동으로 확인합니다.' : '먼저 카카오 인증을 완료해 주세요.',
+          message: unavailable
+              ? '서버 연결이 지연되고 있습니다. 잠시 후 자동으로 확인합니다.'
+              : '먼저 카카오 인증을 완료해 주세요.',
           transient: unavailable,
         );
       }
@@ -337,12 +343,12 @@ class _CommunityOnboardingScreenState extends State<CommunityOnboardingScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('서비스 이용을 위한 필수 설정'),
+          title: const Text('서비스 설정'),
           automaticallyImplyLeading: false,
           leading: widget.onBackToModeSelection == null
               ? null
               : IconButton(
-                  tooltip: '모드 선택으로 돌아가기',
+                  tooltip: '처음으로',
                   icon: const Icon(Icons.arrow_back),
                   onPressed: widget.onBackToModeSelection,
                 ),
@@ -374,13 +380,13 @@ class _CommunityOnboardingScreenState extends State<CommunityOnboardingScreen> {
     final gate = widget.gate;
     final gateState = gate?.state.state;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
             '카카오 인증과 신고내용 공유 동의를 모두 완료하면 다음 단계로 이동할 수 있습니다.',
-            style: TextStyle(fontSize: 13, height: 1.5),
+            style: TextStyle(fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 16),
           if (gateState == 'config_invalid' ||

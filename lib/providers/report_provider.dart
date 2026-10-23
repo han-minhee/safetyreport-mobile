@@ -1,3 +1,4 @@
+import '../services/standalone_installation.dart';
 export '../models/report_filter.dart';
 import '../models/report_filter.dart';
 import '../services/client_compatibility.dart';
@@ -57,6 +58,16 @@ class _PageRead {
 }
 
 class ReportProvider with ChangeNotifier {
+  /// Legacy adapter retained for DB/server contract tests and migration code.
+  @visibleForTesting
+  ReportProvider() : _standaloneOnly = false;
+
+  /// The only provider constructed by the shipping application.
+  ReportProvider.standaloneOnly() : _standaloneOnly = true {
+    _appMode = AppMode.standalone;
+  }
+  final bool _standaloneOnly;
+
   AppMode _appMode = AppMode.server;
   AppThemeMode _themeMode = AppThemeMode.system;
   String _standaloneUsername = '';
@@ -880,6 +891,7 @@ class ReportProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance().timeout(
         const Duration(seconds: 5),
       );
+      if (_standaloneOnly) await StandaloneInstallation.prepare(prefs);
       _appMode = AppModeX.fromString(prefs.getString(AppPrefsKeys.appMode));
       _themeMode = AppThemeModeX.fromString(
         prefs.getString(AppPrefsKeys.themeMode),
@@ -1088,6 +1100,7 @@ class ReportProvider with ChangeNotifier {
   }
 
   Future<void> setConfig(String url, String key) async {
+    if (_standaloneOnly) throw UnsupportedError('서버 연결은 지원하지 않습니다.');
     SyncEngine.stop();
     StandaloneAuthService.invalidateOperations();
     await PermissionService.stopWsService();
@@ -1274,7 +1287,7 @@ class ReportProvider with ChangeNotifier {
     _resetDatasetView();
     ratingCauseDraft = '';
     ClientCompatibility.invalidate();
-    _appMode = AppMode.server;
+    _appMode = _standaloneOnly ? AppMode.standalone : AppMode.server;
     _baseUrl = '';
     _apiKey = '';
     _standaloneUsername = '';

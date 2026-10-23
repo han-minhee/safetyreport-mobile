@@ -196,7 +196,7 @@ void main() {
         readiness: SecureStorageReadiness.reauthenticationRequired,
       ),
     );
-    await tester.tap(find.text('저장된 로그인 정보 초기화하고 다시 로그인'));
+    await tester.tap(find.text('로그인 정보 초기화'));
     await tester.pumpAndSettle();
     expect(find.textContaining('신고 자료'), findsWidgets);
     await tester.tap(find.text('취소'));
@@ -275,7 +275,7 @@ void main() {
         ),
       );
       expect(resets, 0);
-      await tester.tap(find.text('저장된 로그인 정보 초기화하고 다시 로그인'));
+      await tester.tap(find.text('로그인 정보 초기화'));
       await tester.pumpAndSettle();
       expect(resets, 0);
       await tester.tap(find.text('초기화하고 다시 로그인'));
@@ -306,7 +306,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('앱 종료').hitTestable(), findsOneWidget);
-    await tester.tap(find.text('저장된 로그인 정보 초기화하고 다시 로그인'));
+    await tester.tap(find.text('로그인 정보 초기화'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('취소').hitTestable(), findsOneWidget);

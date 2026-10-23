@@ -95,6 +95,7 @@ class NotificationWork(context: Context, params: WorkerParameters) : ListenableW
         completion = callback
         main.post {
             if (finished.get()) return@post
+            if (prefs.getString("flutter.appMode", "") != "standalone") { finish(true); return@post }
             admitted = active.compareAndSet(false, true)
             if (!admitted) { finish(false); return@post }
             try {

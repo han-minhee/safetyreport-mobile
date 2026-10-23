@@ -1,3 +1,5 @@
+import 'screens/reports_workspace.dart';
+import 'widgets/sr_navigation.dart';
 import 'services/bundled_sqlite.dart';
 import 'services/notification_background.dart';
 import 'community/upload_hooks.dart';
@@ -17,8 +19,6 @@ import 'package:provider/provider.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'screens/dashboard_screen.dart';
-import 'screens/report_list_screen.dart';
-import 'screens/report_management_screen.dart';
 import 'screens/statistics_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/official_account_start_screen.dart';
@@ -108,7 +108,7 @@ Future<void> main() async {
   ]);
   // 커뮤니티 계정(Standalone) 로그인 복귀 링크 — SetupScreen·설정 등 어느 화면에서든 받도록 앱 시작 때 등록.
   // 게이트 중에도 수신한다(게이트가 끝나면 상태가 반영된다). 세션 복원(load)이 끝난 뒤에 받는다.
-  final reportProvider = ReportProvider();
+  final reportProvider = ReportProvider.standaloneOnly();
   // 저장된 데모 모드를 첫 게이트 검사·인증 링크 처리 전에 확정한다.
   await reportProvider.init();
   final preparedStore = await communityStoreFuture;
@@ -341,8 +341,8 @@ class _SafetyReportAppState extends State<SafetyReportApp> {
       scaffoldMessengerKey: communityAuthMessengerKey,
       builder: (context, child) =>
           context.select<ReportProvider, bool>((p) => p.isStandaloneDemo)
-          ? (child ?? const SizedBox.shrink())
-          : CommunityAuthPrompt(child: child ?? const SizedBox.shrink()),
+              ? (child ?? const SizedBox.shrink())
+              : CommunityAuthPrompt(child: child ?? const SizedBox.shrink()),
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,
@@ -948,6 +948,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     with WidgetsBindingObserver
     implements NativeNavTarget {
   int _selectedIndex = 0;
+  bool _selectionActive = false;
   String _lastQuickActionSignature = '';
   late final List<Widget?> _screenCache = List<Widget?>.filled(_tabCount, null);
 
@@ -986,7 +987,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   /// 하단 탭을 바꾸고 그 화면을 새로 고친다.
   void _selectTab(int index) {
     if (!mounted) return;
-    final clamped = index.clamp(0, _tabCount - 1);
+    final clamped = index == MainTabs.management
+        ? MainTabs.reports
+        : index.clamp(0, _tabCount - 1);
     setState(() => _selectedIndex = clamped);
     _refreshOnTab(clamped);
   }
@@ -1026,7 +1029,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final subTab = request.subTab;
     final eventType = request.eventType;
     final payloadJson = request.payloadJson;
-    if (subTab != null) {
+    if (tab == MainTabs.notifications && subTab != null) {
       context.read<NotificationHistoryProvider>().setPreferredTabIndex(
         subTab,
         notify: false,
@@ -1041,7 +1044,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         AppRoutes.openCrawl(context);
       }
     } else {
-      _selectTab(tab);
+      _tabs.goTo(tab, subTab: subTab);
     }
     if (payloadJson.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1583,8 +1586,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (cached != null) return cached;
     final screen = switch (index) {
       0 => const DashboardScreen(),
-      1 => const ReportListScreen(),
-      2 => const ReportManagementScreen(),
+      1 => const ReportsWorkspace(),
+      2 => const SizedBox.shrink(),
       3 => const StatisticsScreen(),
       4 => const NotificationsScreen(),
       _ => const SizedBox.shrink(),
@@ -1619,25 +1622,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       });
     }
 
+    final wide = MediaQuery.sizeOf(context).width >= 700;
+    final showNavigation =
+        !_selectionActive && MediaQuery.viewInsetsOf(context).bottom == 0;
     final screen = Scaffold(
-      body: Column(
+      body: Row(
         children: [
-          if (!p.isStandaloneDemo)
-            CloudDelayBanner(gate: context.read<CommunityGate>()),
+          if (wide && showNavigation) _buildNavigationBar(unread, rail: true),
           Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: List<Widget>.generate(_tabCount, (index) {
-                final cached = _screenCache[index];
-                if (cached != null || index == _selectedIndex) {
-                  // 숨은 탭은 TickerMode false — 애니메이션 정지 + SelectionBackScope 가 뒤로가기를 가로채지 않게 한다.
-                  return TickerMode(
-                    enabled: index == _selectedIndex,
-                    child: _buildScreen(index),
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
+            child: Column(
+              children: [
+                if (!p.isStandaloneDemo)
+                  CloudDelayBanner(gate: context.read<CommunityGate>()),
+                Expanded(
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: List<Widget>.generate(_tabCount, (index) {
+                      final cached = _screenCache[index];
+                      if (cached != null || index == _selectedIndex) {
+                        // 숨은 탭은 TickerMode false — 애니메이션 정지 + SelectionBackScope 가 뒤로가기를 가로채지 않게 한다.
+                        return TickerMode(
+                          enabled: index == _selectedIndex,
+                          child: _buildScreen(index),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1653,7 +1666,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   ? p.fetchMaintenanceStatus
                   : null,
             ),
-          _buildNavigationBar(unread),
+          if (!wide && showNavigation) _buildNavigationBar(unread),
         ],
       ),
     );
@@ -1662,53 +1675,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       controller: _tabs,
       child: MainTabBackScope(
         currentIndex: _selectedIndex,
+        onSelectionChanged: (active) {
+          if (mounted && active != _selectionActive) {
+            setState(() => _selectionActive = active);
+          }
+        },
         onReturnHome: () => _selectTab(MainTabs.dashboard),
         child: screen,
       ),
     );
   }
 
-  Widget _buildNavigationBar(int unread) {
-    return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: _selectTab,
-      destinations: [
-        const NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: '대시보드',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.list_alt_outlined),
-          selectedIcon: Icon(Icons.list_alt),
-          label: '신고내역',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2),
-          label: '신고관리',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.bar_chart_outlined),
-          selectedIcon: Icon(Icons.bar_chart),
-          label: '통계',
-        ),
-        NavigationDestination(
-          icon: Badge(
-            isLabelVisible: unread > 0,
-            label: Text('$unread'),
-            child: const Icon(Icons.notifications_outlined),
-          ),
-          selectedIcon: Badge(
-            isLabelVisible: unread > 0,
-            label: Text('$unread'),
-            child: const Icon(Icons.notifications),
-          ),
-          label: '알림',
-        ),
-      ],
-    );
-  }
+  Widget _buildNavigationBar(int unread, {bool rail = false}) =>
+      SrNavigation(
+        destination: AppDestination.fromLegacy(_selectedIndex),
+        unread: unread,
+        rail: rail,
+        onSelect: (destination) => _tabs.goTo(destination.legacyTab),
+      );
 
   void _refreshNativeQuickActionsIfNeeded(ReportProvider provider) {
     final signature = [

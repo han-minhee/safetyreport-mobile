@@ -103,7 +103,7 @@ class _SecureStorageRecoveryScreenState
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -118,7 +118,7 @@ class _SecureStorageRecoveryScreenState
                                 SecureStorageReadiness.reauthenticationRequired
                             ? '재로그인과 커뮤니티 연결 재설정이 필요합니다'
                             : '저장된 로그인 정보를 읽지 못했습니다',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -141,9 +141,10 @@ class _SecureStorageRecoveryScreenState
                   SecureStorageReadiness.reauthenticationRequired)
                 FilledButton(
                   onPressed: _busy ? null : _confirmReset,
-                  child: Text(_busy ? '초기화 중…' : '저장된 로그인 정보 초기화하고 다시 로그인'),
+                  child: Text(_busy ? '초기화 중…' : '로그인 정보 초기화'),
                 ),
-              FilledButton(
+              const SizedBox(height: 8),
+              OutlinedButton(
                 onPressed: _busy
                     ? null
                     : () => (widget.exit ?? () => SystemNavigator.pop())(),

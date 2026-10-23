@@ -1,3 +1,4 @@
+import 'package:safetyreport/widgets/sr_navigation.dart';
 // SQ-P02: 통계 탭 진입은 "데이터 변경"이 아니다. 데이터가 그대로면 탭을 오가도 목록·통계를 다시 조회하지 않는다.
 // 실제 변경(dataRevision 증가)이 오면 보이는 화면은 한 번 다시 읽고, 숨은 탭은 다시 보일 때 한 번 읽는다.
 import 'dart:convert';
@@ -112,7 +113,7 @@ void main() {
       Future<void> tapTab(String label) async {
         await tester.tap(
           find.descendant(
-            of: find.byType(NavigationBar),
+            of: find.byType(SrNavigation),
             matching: find.text(label),
           ),
         );
@@ -137,7 +138,7 @@ void main() {
         );
         await settle();
 
-        await tapTab('신고내역');
+        await tapTab('신고');
         final listAfterFirstVisit = reportRequests;
         expect(listAfterFirstVisit, greaterThan(0));
 
@@ -147,9 +148,9 @@ void main() {
         // 숨은 신고내역 목록은 통계 탭 진입으로 다시 조회하지 않는다.
         expect(reportRequests, listAfterFirstVisit);
 
-        await tapTab('신고내역');
+        await tapTab('신고');
         await tapTab('통계');
-        await tapTab('대시보드');
+        await tapTab('홈');
         await tapTab('통계');
         expect(reportRequests, listAfterFirstVisit, reason: '목록 재조회 없음');
         expect(statsRequests, statsAfterFirstVisit, reason: '통계 HTTP 재요청 없음');
@@ -161,10 +162,10 @@ void main() {
         expect(reportRequests, listAfterFirstVisit);
 
         // 숨은 목록은 다시 보일 때 한 번 읽는다. 그 뒤 탭을 오가도 더 읽지 않는다.
-        await tapTab('신고내역');
+        await tapTab('신고');
         expect(reportRequests, listAfterFirstVisit * 2);
         await tapTab('통계');
-        await tapTab('신고내역');
+        await tapTab('신고');
         expect(reportRequests, listAfterFirstVisit * 2);
         expect(statsRequests, statsAfterFirstVisit * 2);
 
@@ -219,7 +220,7 @@ void main() {
       Future<void> tapTab(String label) async {
         await tester.tap(
           find.descendant(
-            of: find.byType(NavigationBar),
+            of: find.byType(SrNavigation),
             matching: find.text(label),
           ),
         );
@@ -244,13 +245,13 @@ void main() {
         );
         await settle();
 
-        await tapTab('신고내역');
+        await tapTab('신고');
         final listAfterFirstVisit = reportRequests;
         await tapTab('통계');
         final statsAfterFirstVisit = statsRequests;
         expect(statsAfterFirstVisit, greaterThan(0));
 
-        await tapTab('대시보드');
+        await tapTab('홈');
         await tapTab('통계');
         expect(
           statsRequests,

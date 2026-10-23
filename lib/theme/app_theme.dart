@@ -54,6 +54,8 @@ class AppTheme {
       onSecondaryContainer: isDark
           ? const Color(0xFFDBEAFE)
           : const Color(0xFF0B3C8C),
+      tertiary: isDark ? const Color(0xFFC4B5FD) : const Color(0xFF7156A8),
+      onTertiary: isDark ? t.background : Colors.white,
       tertiaryContainer: t.surfaceAlt,
       onTertiaryContainer: t.textPrimary,
       errorContainer: isDark
@@ -72,14 +74,14 @@ class AppTheme {
       surfaceContainer: t.surfaceAlt,
       surfaceContainerHigh: isDark
           ? const Color(0xFF232324) // --sr-surface-3
-          : const Color(0xFFE9EEF5),
+          : const Color(0xFFEAEAED),
       surfaceContainerHighest: isDark
           ? const Color(0xFF2A2A2C)
-          : const Color(0xFFE2E8F0),
-      outline: isDark ? const Color(0xFF3A3A3D) : const Color(0xFFCBD5E1),
+          : const Color(0xFFE3E3E8),
+      outline: isDark ? const Color(0xFF3A3A3D) : const Color(0xFFC7C7CC),
       outlineVariant: t.border,
-      inverseSurface: isDark ? t.textPrimary : const Color(0xFF1E293B),
-      onInverseSurface: isDark ? t.background : const Color(0xFFF8FAFC),
+      inverseSurface: isDark ? t.textPrimary : const Color(0xFF242426),
+      onInverseSurface: isDark ? t.background : const Color(0xFFF5F5F7),
       inversePrimary: isDark ? lightPrimary : darkPrimary,
       shadow: Colors.black,
       scrim: Colors.black,
@@ -109,7 +111,23 @@ class AppTheme {
       canvasColor: t.background,
       dividerColor: t.border,
       // 작은 글자 단계(spec §3 Caption 12/16). Material 기본 labelSmall(11)은 최소 크기 밑이라 올린다(SQ-U19).
+      visualDensity: VisualDensity.standard,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          fontSize: 28,
+          height: 1.25,
+          fontWeight: FontWeight.w700,
+        ),
+        headlineSmall: TextStyle(
+          fontSize: 24,
+          height: 1.3,
+          fontWeight: FontWeight.w700,
+        ),
+        titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        bodyLarge: TextStyle(fontSize: 16, height: 1.5),
+        bodyMedium: TextStyle(fontSize: 14, height: 1.45),
         bodySmall: TextStyle(fontSize: SrFontSize.caption),
         labelSmall: TextStyle(fontSize: SrFontSize.caption),
       ),
@@ -122,33 +140,30 @@ class AppTheme {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: overlayStyle,
+        titleSpacing: 16,
         titleTextStyle: TextStyle(
           color: t.textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
         ),
       ),
       tabBarTheme: TabBarThemeData(
         // 시안의 알약형 선택 탭. 선택/미선택 모두 배경 대비 AA 를 만족해야 한다(test/theme).
-        indicator: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(SrRadius.pill),
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(color: primary, width: 2),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         indicatorColor: fill,
         dividerColor: Colors.transparent,
-        labelColor: onFill,
+        labelColor: primary,
         unselectedLabelColor: t.textSecondary,
-        labelStyle: const TextStyle(
-          fontSize: 13.5,
-          fontWeight: FontWeight.w700,
-        ),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(
-          fontSize: 13.5,
+          fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
-        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-        splashBorderRadius: BorderRadius.circular(SrRadius.pill),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+        splashBorderRadius: BorderRadius.circular(SrRadius.md),
         overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: 0.08)),
       ),
       cardTheme: CardThemeData(
@@ -183,7 +198,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? t.surfaceAlt : Colors.white,
+        fillColor: t.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 12,
@@ -204,7 +219,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: t.surface,
         elevation: 0,
-        height: 68,
+        height: 72,
         indicatorColor: isDark ? primary.withValues(alpha: 0.22) : t.brandSoft,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
@@ -226,7 +241,8 @@ class AppTheme {
         ),
       ),
       listTileTheme: ListTileThemeData(
-        iconColor: primary,
+        iconColor: t.textSecondary,
+        minVerticalPadding: 12,
         textColor: t.textPrimary,
       ),
       chipTheme: ChipThemeData(
@@ -237,7 +253,7 @@ class AppTheme {
           fontSize: SrFontSize.caption,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(SrRadius.pill),
+          borderRadius: BorderRadius.circular(SrRadius.md),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -247,6 +263,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 48),
           backgroundColor: fill,
           foregroundColor: onFill,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -257,6 +274,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           side: BorderSide(color: t.border),
           shape: RoundedRectangleBorder(
@@ -266,10 +284,20 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(SrRadius.lg),
           ),
         ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+      ),
+      expansionTileTheme: ExpansionTileThemeData(
+        iconColor: t.textSecondary,
+        collapsedIconColor: t.textSecondary,
+        shape: const Border(),
+        collapsedShape: const Border(),
       ),
       switchTheme: SwitchThemeData(
         trackOutlineColor: WidgetStatePropertyAll(t.border),

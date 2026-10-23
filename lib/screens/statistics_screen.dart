@@ -1,3 +1,4 @@
+import '../widgets/sr_surface.dart';
 import '../services/performance_trace.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -285,7 +286,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   );
 
   /// `AgencyStats.forCategory` 가 안전신고·생활불편을 안다(구서버 응답이면 null-safe 빈 상세로 내려간다).
-  CategoryStats get _currentCat => _stats?.forCategory(_cat) ?? _emptyCategoryStats;
+  CategoryStats get _currentCat =>
+      _stats?.forCategory(_cat) ?? _emptyCategoryStats;
 
   List<AgencyStatRow> get _typeRows {
     final group = _currentCat;
@@ -586,15 +588,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Conditions(
-          year: _year,
-          yearOptions: _yearOptions,
-          cat: _cat,
-          lawLabel: _lawLabel,
-          lawActive: _law != null,
-          onYearChanged: _setYear,
-          onCatChanged: (v) => setState(() => _cat = v),
-          onLawTap: _showLawFilter,
+        SrSurface(
+          padding: const EdgeInsets.all(16),
+          child: _Conditions(
+            year: _year,
+            yearOptions: _yearOptions,
+            cat: _cat,
+            lawLabel: _lawLabel,
+            lawActive: _law != null,
+            onYearChanged: _setYear,
+            onCatChanged: (v) => setState(() => _cat = v),
+            onLawTap: _showLawFilter,
+          ),
         ),
         if (_loading)
           const Padding(
@@ -621,7 +626,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             Text(
               '요약 · ${_catLabels[_cat]}',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: sr.textPrimary,
               ),
@@ -677,7 +682,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           '상세 통계',
           key: _detailKey,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 20,
             fontWeight: FontWeight.w800,
             color: sr.textPrimary,
           ),
@@ -799,7 +804,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           Divider(color: sr.border),
           const SizedBox(height: 8),
           Text(
-            '안전신문고 공개 통계의 행정구역별 현황입니다. 위의 내 신고 통계와 다른 자료이며 조건이 적용되지 않습니다.',
+            '안전신문고 공개 통계 · 내 신고 통계와 별개이며 필터가 적용되지 않습니다.',
             style: TextStyle(
               fontSize: SrFontSize.caption,
               color: sr.textSecondary,
@@ -957,9 +962,9 @@ class _Conditions extends StatelessWidget {
           height:
               40 +
               (MediaQuery.textScalerOf(context).scale(13) - 13).clamp(
-                0,
-                double.infinity,
-              ) *
+                    0,
+                    double.infinity,
+                  ) *
                   1.5,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,

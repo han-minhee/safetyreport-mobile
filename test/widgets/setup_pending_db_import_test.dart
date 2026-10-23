@@ -6,7 +6,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:safetyreport/models/app_mode.dart';
 import 'package:safetyreport/providers/report_provider.dart';
@@ -14,8 +13,6 @@ import 'package:safetyreport/screens/setup_screen.dart';
 import 'package:safetyreport/services/app_prefs_keys.dart';
 import 'package:safetyreport/services/pending_db_import_action.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../support/selfhost_client_fixture.dart';
 
 const _path = '/storage/emulated/0/Documents/mysafetyreport/server_db_1.db';
 
@@ -160,56 +157,33 @@ void main() {
     expect(find.textContaining(_path), findsOneWidget, reason: '받은 파일 위치 안내');
   });
 
-  // SQ-B09: 서버 연결 확인 중 화면을 닫으면 응답 뒤 setState 하지 않는다.
-  testWidgets('SQ-B09 leaving the server setup during the connection check '
-      'does not call setState after dispose', (tester) async {
-    resetSelfhostFixture();
-    final release = Completer<void>();
-    await http.runWithClient(
-      () async {
-        final provider = _RecordingProvider(events);
-        addTearDown(provider.dispose);
-        await tester.pumpWidget(
-          ChangeNotifierProvider<ReportProvider>.value(
-            value: provider,
-            child: MaterialApp(
-              home: Builder(
-                builder: (context) => TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          const SetupScreen(initialMode: AppMode.server),
-                    ),
-                  ),
-                  child: const Text('open'),
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.tap(find.text('open'));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.widgetWithText(TextField, '서버 URL'),
-          'https://fixture.test',
-        );
-        await tester.enterText(
-          find.widgetWithText(TextField, 'API Key'),
-          'synthetic',
-        );
-        await tester.tap(find.text('연결 확인 후 시작하기'));
-        await tester.pump();
-        await tester.binding.handlePopRoute();
-        await settle(tester);
-        expect(find.byType(SetupScreen), findsNothing);
-        release.complete();
-        await settle(tester);
-        expect(tester.takeException(), isNull);
-      },
-      () => selfhostMockClient((request) async {
-        await release.future;
-        return http.Response('{}', 500);
-      }),
-    );
-  });
+  testWidgets(
+    'closing direct login while authenticating does not access disposed state',
+    (tester) async {
+      final release = Completer<void>();
+      SetupScreen.standaloneLoginOverride = (_, _) => release.future;
+      final provider = _RecordingProvider(events);
+      addTearDown(provider.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ReportProvider>.value(
+          value: provider,
+          child: const MaterialApp(home: SetupScreen()),
+        ),
+      );
+      await tester.enterText(find.widgetWithText(TextField, '아이디'), 'user');
+      await tester.enterText(find.widgetWithText(TextField, '비밀번호'), 'pw');
+      await tester.enterText(
+        find.widgetWithText(TextField, '휴대폰번호'),
+        '01012345678',
+      );
+      await tester.ensureVisible(find.text('로그인'));
+      await tester.tap(find.text('로그인'));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      release.complete();
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+      expect(events, isEmpty);
+    },
+  );
 }

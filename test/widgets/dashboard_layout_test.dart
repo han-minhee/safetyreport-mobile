@@ -118,7 +118,7 @@ Future<List<FlutterErrorDetails>> _pump(
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: const DashboardScreen(),
+          home: const DashboardScreen(overview: true),
         ),
       ),
     );
@@ -273,6 +273,18 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('recent answers precede supporting charts and watchlist', (
+    tester,
+  ) async {
+    await _pump(tester, brightness: Brightness.light, height: 2400);
+    final recent = tester.getTopLeft(find.text('최근 답변 · 3일')).dy;
+    expect(
+      recent,
+      greaterThan(tester.getBottomLeft(find.byType(SyncStatusCard)).dy),
+    );
+    expect(recent, lessThan(tester.getTopLeft(find.text('교통위반 처리 현황')).dy));
+  });
+
   testWidgets('감시 목록은 대시보드에서 3건까지 한 줄 요약으로 보이고 나머지는 더 보기로 넘긴다', (tester) async {
     await _pump(tester, brightness: Brightness.light, height: 2400);
     final rows = _watchRows;
@@ -316,10 +328,13 @@ void main() {
       demo: true,
     );
     expect(errors, isEmpty, reason: describeErrors(errors));
-    final desc = find.text('데모 모드에서는 동기화를 실행할 수 없습니다');
+    final desc = find.text('데모에서는 동기화할 수 없습니다');
     // 이동 버튼이 설명 오른쪽에 있으면 폭이 모자라 "없습/니다"처럼 꺾였다.
     expect(tester.getSize(desc).height, lessThan(24));
-    final action = find.text('동기화 화면');
+    final action = find.descendant(
+      of: find.byType(SyncStatusCard),
+      matching: find.byIcon(Icons.chevron_right),
+    );
     expect(tester.getTopLeft(action).dy, lessThan(tester.getTopLeft(desc).dy));
   });
 
@@ -332,15 +347,18 @@ void main() {
       demo: true,
     );
     expect(errors, isEmpty, reason: describeErrors(errors));
-    final desc = find.text('데모 모드에서는 동기화를 실행할 수 없습니다');
-    final action = find.text('동기화 화면');
+    final desc = find.text('데모에서는 동기화할 수 없습니다');
+    final action = find.descendant(
+      of: find.byType(SyncStatusCard),
+      matching: find.byIcon(Icons.chevron_right),
+    );
     expect(
       tester.getTopLeft(action).dy,
       greaterThanOrEqualTo(tester.getBottomLeft(desc).dy),
     );
     // 말줄임(…)으로 잘리지 않았다.
     expect(
-      tester.renderObject<RenderParagraph>(action).didExceedMaxLines,
+      tester.renderObject<RenderParagraph>(desc).didExceedMaxLines,
       isFalse,
     );
   });

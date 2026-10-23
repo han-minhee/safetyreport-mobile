@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show ValueListenable, visibleForTesting;
 import 'package:flutter/material.dart';
+import 'sr_surface.dart';
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -100,23 +101,31 @@ void _showReportDetailSheetNow(BuildContext context, Report report) {
   try {
     isDemo = context.read<ReportProvider>().isStandaloneDemo;
   } catch (_) {}
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    // 전체 높이까지 끌어올려도 상태 표시줄 아래에서 멈춘다(SQ-U07).
-    useSafeArea: true,
-    builder: (_) => ReportDetailSheet(report: report),
-  ).then((_) {
-    // 최근에 받은 좋은 결과를 다 보고 닫은 직후가 스토어 별점 요청 시점(조건은 ReviewPromptService).
-    unawaited(
-      ReviewPromptService.maybeRequestAfterViewing(report, isDemo: isDemo),
-    );
-  });
+  Navigator.of(context)
+      .push<void>(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('신고 상세')),
+            body: ReportDetailSheet(report: report, fullPage: true),
+          ),
+        ),
+      )
+      .then((_) {
+        // 최근에 받은 좋은 결과를 다 보고 닫은 직후가 스토어 별점 요청 시점(조건은 ReviewPromptService).
+        unawaited(
+          ReviewPromptService.maybeRequestAfterViewing(report, isDemo: isDemo),
+        );
+      });
 }
 
 class ReportDetailSheet extends StatelessWidget {
   final Report report;
-  const ReportDetailSheet({super.key, required this.report});
+  const ReportDetailSheet({
+    super.key,
+    required this.report,
+    this.fullPage = false,
+  });
+  final bool fullPage;
 
   /// 첨부 동영상 컨트롤러 생성(테스트에서 가짜로 바꿔 끼운다).
   @visibleForTesting
@@ -170,11 +179,11 @@ class ReportDetailSheet extends StatelessWidget {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && context.mounted) {
-        showSrSnack(context, '안전신문고 앱이 설치되어 있지 않습니다.');
+        showSrSnack(context, '안전신문고 앱을 설치해 주세요.');
       }
     } catch (e) {
       if (context.mounted) {
-        showSrSnack(context, '안전신문고 앱이 설치되어 있지 않습니다.');
+        showSrSnack(context, '안전신문고 앱을 설치해 주세요.');
       }
     }
   }
@@ -251,12 +260,12 @@ class ReportDetailSheet extends StatelessWidget {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.6,
-      maxChildSize: 0.95,
-      minChildSize: 0.3,
+      initialChildSize: fullPage ? 1 : 0.6,
+      maxChildSize: fullPage ? 1 : 0.95,
+      minChildSize: fullPage ? 1 : 0.3,
       // 손잡이는 테마(showDragHandle)가 그린다(SQ-U07).
       builder: (_, sc) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: ListView(
           controller: sc,
           children: [
@@ -268,8 +277,8 @@ class ReportDetailSheet extends StatelessWidget {
                   child: Text(
                     report.name,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -280,7 +289,17 @@ class ReportDetailSheet extends StatelessWidget {
                 ],
               ],
             ),
-            const Divider(height: 24),
+            const SrSectionHeader(title: '처리 결과'),
+            if (report.fineInfo.isNotEmpty) _fineField(context, labelWidth),
+            if (report.penaltyPoints.isNotEmpty)
+              _field(
+                context,
+                labelWidth,
+                Icons.warning_amber_outlined,
+                '벌점',
+                report.penaltyPoints,
+              ),
+            const SrSectionHeader(title: '신고 정보'),
             // 상세 필드
             if (report.reportNumber.isNotEmpty)
               _field(
@@ -330,15 +349,6 @@ class ReportDetailSheet extends StatelessWidget {
                 '담당자',
                 report.manager,
                 ReportFilter(manager: report.manager),
-              ),
-            if (report.fineInfo.isNotEmpty) _fineField(context, labelWidth),
-            if (report.penaltyPoints.isNotEmpty)
-              _field(
-                context,
-                labelWidth,
-                Icons.warning_amber_outlined,
-                '벌점',
-                report.penaltyPoints,
               ),
             if (report.carNumber.isNotEmpty)
               _linkField(
@@ -395,7 +405,7 @@ class ReportDetailSheet extends StatelessWidget {
                 report.ratingCause,
               ),
             if (report.reportContent.isNotEmpty) ...[
-              const Divider(height: 20),
+              const SizedBox(height: 24),
               _textBlock(context, '신고내용', report.reportContent),
             ],
             if (report.supplementCount > 0 ||
@@ -408,7 +418,7 @@ class ReportDetailSheet extends StatelessWidget {
               _SupplementSection(report: report),
             ],
             if (report.processContent.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SrSectionHeader(title: '답변'),
               _textBlock(context, '처리내용', report.processContent),
               Builder(
                 builder: (ctx) {
@@ -528,7 +538,7 @@ class ReportDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '안전신문고 앱이 설치되어 있고 로그인된 상태여야 합니다.',
+              '안전신문고 앱 설치와 로그인이 필요합니다.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: SrFontSize.caption,
@@ -561,23 +571,23 @@ class ReportDetailSheet extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
                       icon: Icon(Icons.open_in_browser, size: 16),
-                      label: const Text('안전신문고 공식 사이트 열기'),
+                      label: const Text('공식 사이트 열기'),
                       onPressed: () => _openOfficialSource(context),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '이 앱은 안전신문고의 공식 앱이 아니며 행정안전부 또는 정부기관을 대표하지 않습니다.',
+                    '안전신문고 비공식 앱이며 정부기관을 대표하지 않습니다.',
                     style: TextStyle(fontSize: 12.5, height: 1.45),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '안전신문고 데이터를 사용자의 편의를 위해 조회·정리해 보여주는 비공식 도구입니다.',
+                    '접수된 신고의 조회·관리 도구입니다.',
                     style: TextStyle(fontSize: 12.5, height: 1.45),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '원문 확인과 실제 민원 처리는 안전신문고 공식 서비스에서 진행해 주세요.',
+                    '원문 확인·민원 처리는 공식 안전신문고에서 진행해 주세요.',
                     style: TextStyle(fontSize: 12.5, height: 1.45),
                   ),
                 ],
@@ -646,9 +656,9 @@ class ReportDetailSheet extends StatelessWidget {
   Widget _sectionLabel(BuildContext context, String text) => Text(
     text,
     style: TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.bold,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: Theme.of(context).colorScheme.onSurface,
     ),
   );
 
@@ -670,14 +680,14 @@ class ReportDetailSheet extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: context.sr.surfaceAlt,
-            borderRadius: BorderRadius.circular(SrRadius.md),
+            color: context.sr.surface,
             border: Border.all(color: context.sr.border),
+            borderRadius: BorderRadius.circular(SrRadius.lg),
           ),
           child: SelectableText(
             value,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               height: 1.6,
               color: scheme.onSurface,
             ),
@@ -876,7 +886,7 @@ class ReportDetailSheet extends StatelessWidget {
     final category = await provider.categoryForNavigation(report);
     if (!context.mounted) return;
     if (category == null) {
-      showSrSnack(context, '신고 카테고리 정보를 찾지 못했습니다.', kind: SrSnackKind.error);
+      showSrSnack(context, '신고 분류를 찾지 못했습니다.', kind: SrSnackKind.error);
       return;
     }
 
@@ -925,7 +935,7 @@ class _DetailFieldRow extends StatelessWidget {
     );
     // 줄 사이 여백 없이 같은 높이를 쓰고, 긴 값은 같은 내부 여백으로 늘어난다.
     return Container(
-      constraints: const BoxConstraints(minHeight: 34),
+      constraints: const BoxConstraints(minHeight: 48),
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: LayoutBuilder(

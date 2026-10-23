@@ -773,7 +773,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   Widget _buildLocalPathCard(String displayPath, {required bool hasParent}) {
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
           ListTile(

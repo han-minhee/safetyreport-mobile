@@ -10,13 +10,10 @@ import '../services/app_prefs_keys.dart';
 import '../services/local_db_service.dart';
 import '../widgets/official_account_reset_dialog.dart';
 import '../services/pending_db_import_action.dart';
-import '../services/server_connection_service.dart';
 import '../services/standalone_auth_service.dart';
 import '../theme/sr_colors.dart';
 import '../widgets/sr_snack_bar.dart';
 import '../theme/sr_tokens.dart';
-
-enum _Step { selectMode, serverConfig, standaloneConfig }
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({
@@ -42,17 +39,10 @@ class SetupScreen extends StatefulWidget {
 }
 
 class _SetupScreenState extends State<SetupScreen> {
-  late _Step _step;
-
   @override
   void initState() {
     super.initState();
     _errorMessage = widget.initialNotice;
-    _step = switch (widget.initialMode) {
-      AppMode.server => _Step.serverConfig,
-      AppMode.standalone => _Step.standaloneConfig,
-      null => _Step.selectMode,
-    };
   }
 
   @override
@@ -64,8 +54,6 @@ class _SetupScreenState extends State<SetupScreen> {
     }
   }
 
-  final _urlController = TextEditingController();
-  final _apiController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -90,29 +78,10 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   void dispose() {
-    _urlController.dispose();
-    _apiController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
     super.dispose();
-  }
-
-  void _goToStep(_Step step) {
-    setState(() {
-      _step = step;
-      _errorMessage = null;
-    });
-  }
-
-  void _selectMode(AppMode mode) {
-    if (widget.onModeSelected != null && mode == AppMode.server) {
-      widget.onModeSelected!(mode);
-    } else {
-      _goToStep(
-        mode == AppMode.server ? _Step.serverConfig : _Step.standaloneConfig,
-      );
-    }
   }
 
   Future<void> _enterDemo() async {
@@ -147,38 +116,6 @@ class _SetupScreenState extends State<SetupScreen> {
     if (navigator.canPop()) navigator.popUntil((route) => route.isFirst);
   }
 
-  Future<void> _connectServer() async {
-    final url = _urlController.text.trim();
-    final key = _apiController.text.trim();
-    if (url.isEmpty || key.isEmpty) {
-      setState(() => _errorMessage = '서버 URL과 API Key를 모두 입력해주세요.');
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
-    try {
-      final result = await ServerConnectionService.testConnection(
-        baseUrl: url,
-        apiKey: key,
-      );
-      if (!mounted) return;
-      if (!result.isOk) {
-        setState(() => _errorMessage = result.message ?? '서버에 연결할 수 없습니다.');
-        return;
-      }
-      await context.read<ReportProvider>().setConfig(result.normalizedUrl, key);
-      // 루트의 설정 완료 흐름이 다음 화면을 선택한다. 권한 화면을 다시 쌓지 않는다.
-      _finishSetup();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorMessage = '서버에 연결할 수 없습니다.\n$e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   Future<void> _loginStandalone() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
@@ -195,7 +132,7 @@ class _SetupScreenState extends State<SetupScreen> {
       return;
     }
     if (username.isEmpty || password.isEmpty || phoneNumber.isEmpty) {
-      setState(() => _errorMessage = '아이디, 비밀번호, 휴대폰번호를 모두 입력해주세요.');
+      setState(() => _errorMessage = '아이디·비밀번호·휴대폰번호를 입력해 주세요.');
       return;
     }
     setState(() {
@@ -226,10 +163,7 @@ class _SetupScreenState extends State<SetupScreen> {
       if (imported.status == PendingDbImportStatus.kept) {
         // 결정을 받지 못했다(화면이 닫힘 등). 대기 작업을 남기고 모드도 켜지 않는다 — 다음 로그인에서 다시 시도.
         if (mounted) {
-          setState(
-            () => _errorMessage =
-                'DB 가져오기를 마치지 못해 Standalone 모드를 켜지 않았습니다. 다시 로그인하면 다시 시도합니다.',
-          );
+          setState(() => _errorMessage = 'DB 가져오기 실패. 로그인하면 다시 시도합니다.');
         }
         return;
       }
@@ -344,172 +278,13 @@ class _SetupScreenState extends State<SetupScreen> {
       canPop: !widget.accountRecovery,
       child: Scaffold(
         body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            transitionBuilder: (child, anim) =>
-                FadeTransition(opacity: anim, child: child),
-            child: switch (_step) {
-              _Step.selectMode => _buildModeSelect(),
-              _Step.serverConfig => _buildServerConfig(),
-              _Step.standaloneConfig => _buildStandaloneConfig(),
-            },
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: _buildStandaloneConfig(),
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildModeSelect() {
-    return SingleChildScrollView(
-      key: const ValueKey('selectMode'),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 24),
-          // 서버 웹 로그인 화면과 같은 로고(2026-09-24). 라이트/다크 두 벌을 테마로 고른다.
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Image.asset(
-                Theme.of(context).brightness == Brightness.dark
-                    ? 'assets/branding/logo_lockup_dark.png'
-                    : 'assets/branding/logo_lockup_light.png',
-                semanticLabel: '나만의 안전신문고',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '연결 방식을 선택해주세요',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: context.sr.textSecondary),
-          ),
-          const SizedBox(height: 40),
-          _ModeCard(
-            icon: Icons.dns_rounded,
-            color: Theme.of(context).colorScheme.primary,
-            title: 'Client 모드',
-            description:
-                '직접 구축한 크롤링 서버와 연결합니다.\n자동 크롤링, 통계, 파일 관리 등 모든 기능을 사용할 수 있습니다.',
-            onTap: () => _selectMode(AppMode.server),
-          ),
-          const SizedBox(height: 16),
-          _ModeCard(
-            icon: Icons.phone_android_rounded,
-            color: context.tone(SrTone.success).foreground,
-            title: 'Standalone 모드',
-            description: '안전신문고 계정으로 앱에서 직접 접근합니다.\n서버 없이 신고 현황을 조회할 수 있습니다.',
-            onTap: () => _selectMode(AppMode.standalone),
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton(
-              onPressed: _loading ? null : _enterDemo,
-              style: TextButton.styleFrom(
-                textStyle: const TextStyle(
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              child: const Text('Demo 보기'),
-            ),
-          ),
-          if (_loading) const Center(child: CircularProgressIndicator()),
-          if (_errorMessage != null)
-            Text(_errorMessage!, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServerConfig() {
-    final cs = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      key: const ValueKey('serverConfig'),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(Icons.arrow_back),
-                tooltip: '모드 선택으로 돌아가기',
-                onPressed: widget.accountRecovery
-                    ? null
-                    : () => _goToStep(_Step.selectMode),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '서버 연결 설정',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: cs.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Icon(
-            Icons.dns_rounded,
-            size: 52,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '서버 URL과 API Key를 입력해주세요.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.sr.textSecondary),
-          ),
-          const SizedBox(height: 28),
-          TextField(
-            controller: _urlController,
-            decoration: const InputDecoration(
-              labelText: '서버 URL',
-              hintText: 'https://',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.link),
-            ),
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            enabled: !_loading,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _apiController,
-            decoration: const InputDecoration(
-              labelText: 'API Key',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.vpn_key),
-            ),
-            obscureText: true,
-            autocorrect: false,
-            enabled: !_loading,
-          ),
-          _buildError(),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            icon: _loading
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  )
-                : Icon(Icons.wifi_find, size: 18),
-            label: Text(_loading ? '연결 확인 중...' : '연결 확인 후 시작하기'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: _loading ? null : _connectServer,
-          ),
-        ],
       ),
     );
   }
@@ -517,44 +292,26 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget _buildStandaloneConfig() {
     return SingleChildScrollView(
       key: const ValueKey('standaloneConfig'),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(Icons.arrow_back),
-                tooltip: '모드 선택으로 돌아가기',
-                // 로그인·DB 가져오기 중에는 떠나지 않는다(SQ-B03).
-                onPressed: _loading || widget.accountRecovery
-                    ? null
-                    : () => _goToStep(_Step.selectMode),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '안전신문고 로그인',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: context.tone(SrTone.success).foreground,
-                ),
-              ),
-            ],
-          ),
+          Text('나만의 안전신문고', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text('안전신문고 로그인', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 24),
           Icon(
-            Icons.lock_open_rounded,
-            size: 52,
-            color: context.tone(SrTone.success).foreground,
+            Icons.shield_outlined,
+            size: 40,
+            color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 16),
-          Text(
-            '안전신문고 아이디와 비밀번호를 입력하세요.\n서버 없이 앱에서 직접 신고 현황을 조회합니다.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.sr.textSecondary, height: 1.5),
-          ),
+          if (widget.onModeSelected != null)
+            TextButton(
+              onPressed: _loading ? null : _enterDemo,
+              child: const Text('데모 보기'),
+            ),
           const SizedBox(height: 28),
           TextField(
             controller: _usernameController,
@@ -594,7 +351,7 @@ class _SetupScreenState extends State<SetupScreen> {
             controller: _phoneController,
             decoration: const InputDecoration(
               labelText: '휴대폰번호',
-              helperText: '별점 사유 조회에 사용됩니다. 숫자만 입력해도 됩니다.',
+              helperText: '별점 사유 조회용 · 숫자만 입력',
               helperMaxLines: 2,
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.phone_outlined),
@@ -620,7 +377,6 @@ class _SetupScreenState extends State<SetupScreen> {
               _importing ? 'DB 가져오는 중...' : (_loading ? '로그인 중...' : '로그인'),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: context.sr.successFill,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: _loading ? null : _loginStandalone,
@@ -644,7 +400,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '비밀번호는 RSA 암호화 후 안전신문고 서버에 전송됩니다. 자동 재로그인을 위해 기기의 보안 저장소(암호화)에 저장됩니다.',
+                    '비밀번호는 RSA 암호화해 전송하고, 자동 로그인용으로 기기에 암호화해 저장합니다.',
                     style: TextStyle(
                       fontSize: 12,
                       color: context.sr.textSecondary,
@@ -691,87 +447,6 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String description;
-  final VoidCallback onTap;
-
-  const _ModeCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.description,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(SrRadius.xl),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-            borderRadius: BorderRadius.circular(SrRadius.xl),
-            color: color.withValues(alpha: 0.04),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(SrRadius.lg),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: context.sr.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: color.withValues(alpha: 0.5)),
-            ],
-          ),
         ),
       ),
     );

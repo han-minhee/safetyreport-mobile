@@ -1,3 +1,4 @@
+import 'sr_surface.dart';
 import 'rating_dialog.dart';
 import 'dart:async';
 
@@ -221,96 +222,97 @@ class _SelectionActionBarState extends State<SelectionActionBar> {
       (r) => !watchlistNums.contains(r.reportNumber),
     );
 
-    return Material(
-      elevation: 12,
-      color: cs.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 상태 행
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: '선택 취소',
-                    onPressed: widget.onCancel,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$count개 선택됨',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: SrSurface(
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 상태 행
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: '선택 취소',
+                      onPressed: widget.onCancel,
+                      visualDensity: VisualDensity.compact,
                     ),
-                  ),
-                  const Spacer(),
-                  if (_busy)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$count개 선택됨',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // 액션 버튼 행
-              Row(
-                children: [
-                  _ActionBtn(
-                    icon: Icons.copy,
-                    label: '번호 복사',
-                    onTap: _busy ? null : _copyNumbers,
-                  ),
-                  if (!isStandalone) ...[
-                    const SizedBox(width: 8),
-                    _ActionBtn(
-                      icon: Icons.refresh,
-                      label: '크롤링',
-                      onTap: _busy ? null : _crawl,
-                      color: cs.primary,
-                    ),
+                    const Spacer(),
+                    if (_busy)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                   ],
-                  if (isStandalone) ...[
+                ),
+                const SizedBox(height: 8),
+                // 액션 버튼 행
+                Row(
+                  children: [
+                    _ActionBtn(
+                      icon: Icons.copy,
+                      label: '번호 복사',
+                      onTap: _busy ? null : _copyNumbers,
+                    ),
+                    if (!isStandalone) ...[
+                      const SizedBox(width: 8),
+                      _ActionBtn(
+                        icon: Icons.refresh,
+                        label: '크롤링',
+                        onTap: _busy ? null : _crawl,
+                        color: cs.primary,
+                      ),
+                    ],
+                    if (isStandalone) ...[
+                      const SizedBox(width: 8),
+                      _ActionBtn(
+                        icon: Icons.sync,
+                        label: '동기화',
+                        onTap: _busy ? null : _sync,
+                        color: cs.primary,
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     _ActionBtn(
-                      icon: Icons.sync,
-                      label: '동기화',
-                      onTap: _busy ? null : _sync,
-                      color: cs.primary,
+                      icon: Icons.star_rate_rounded,
+                      label: '별점 주기',
+                      onTap: _busy ? null : _rate,
+                      color: cs.secondary,
                     ),
+                    const SizedBox(width: 8),
+                    if (!allInWatchlist)
+                      _ActionBtn(
+                        icon: Icons.bookmark_add_outlined,
+                        label: '감시 추가',
+                        onTap: _busy ? null : () => _watchlistAction(true),
+                        color: cs.tertiary,
+                      ),
+                    if (!allInWatchlist && !noneInWatchlist)
+                      const SizedBox(width: 8),
+                    if (!noneInWatchlist)
+                      _ActionBtn(
+                        icon: Icons.bookmark_remove_outlined,
+                        label: '감시 해제',
+                        onTap: _busy ? null : () => _watchlistAction(false),
+                        color: cs.error,
+                      ),
                   ],
-                  const SizedBox(width: 8),
-                  _ActionBtn(
-                    icon: Icons.star_rate_rounded,
-                    label: '별점 주기',
-                    onTap: _busy ? null : _rate,
-                    color: cs.secondary,
-                  ),
-                  const SizedBox(width: 8),
-                  if (!allInWatchlist)
-                    _ActionBtn(
-                      icon: Icons.bookmark_add_outlined,
-                      label: '감시 추가',
-                      onTap: _busy ? null : () => _watchlistAction(true),
-                      color: cs.tertiary,
-                    ),
-                  if (!allInWatchlist && !noneInWatchlist)
-                    const SizedBox(width: 8),
-                  if (!noneInWatchlist)
-                    _ActionBtn(
-                      icon: Icons.bookmark_remove_outlined,
-                      label: '감시 해제',
-                      onTap: _busy ? null : () => _watchlistAction(false),
-                      color: cs.error,
-                    ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

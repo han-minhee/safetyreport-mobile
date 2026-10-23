@@ -12,10 +12,8 @@ import '../models/app_mode.dart';
 import '../models/app_theme_mode.dart';
 import '../providers/report_provider.dart';
 import '../services/api_service.dart';
-import '../services/app_storage_paths.dart';
 import '../services/local_db_service.dart';
 import '../widgets/official_account_reset_dialog.dart';
-import '../services/pending_db_import_action.dart';
 import '../services/permission_service.dart';
 import '../services/server_connection_service.dart';
 import '../services/server_contract.dart';
@@ -23,7 +21,6 @@ import '../services/standalone_auth_service.dart';
 import '../services/review_prompt_service.dart';
 import '../services/support_links.dart';
 import 'permission_screen.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import '../navigation/app_routes.dart';
 import '../widgets/auth_status_notice.dart';
@@ -33,7 +30,6 @@ import '../community/rebuild/standalone_rebuild_runner.dart';
 import '../widgets/community_account_card.dart';
 import '../widgets/community_server_account_card.dart';
 import '../widgets/dispose_on_unmount.dart';
-import '../widgets/mode_badge.dart';
 import '../widgets/sr_page_padding.dart';
 import '../server_palette.dart';
 import '../widgets/status_badge.dart';
@@ -783,9 +779,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (!mounted) return;
           showSrSnack(
             context,
-            kind == 'server'
-                ? '서버 DB 변환 복원이 완료되었습니다.'
-                : '모바일 백업 복원이 완료되었습니다.',
+            kind == 'server' ? '서버 DB 변환 복원이 완료되었습니다.' : '모바일 백업 복원이 완료되었습니다.',
             kind: SrSnackKind.success,
           );
         }
@@ -811,268 +805,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) setState(() => _isRestoringDb = false);
       await _loadPreviousImportBackup();
-    }
-  }
-
-  // ── 모드 변경 ─────────────────────────────────────────────────
-  // Standalone → Client: 현재 모바일 DB 자동 백업 후 reset.
-  // Client → Standalone: 3-way 선택 (서버 DB 변환 / 백업 파일 선택 / 처음부터).
-
-  /// Documents/mysafetyreport (없으면 Download/mysafetyreport) 디렉토리 보장.
-  static Directory _backupDir() => AppStoragePaths.exportsRoot();
-
-  Future<void> _confirmModeReset() async {
-    if (_blockedByRebuild('모드를 전환')) return;
-    final p = context.read<ReportProvider>();
-    final isStandalone = p.appMode == AppMode.standalone;
-    if (isStandalone) {
-      await _confirmStandaloneToServer();
-    } else {
-      await _confirmServerToStandalone();
-    }
-  }
-
-  /// Standalone → Client: 현재 standalone DB 를 자동 백업 후 reset.
-  Future<void> _confirmStandaloneToServer() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Client 모드로 전환'),
-        content: const Text(
-          '현재 Standalone DB 를 자동으로 백업한 후 Client 모드로 전환됩니다.\n'
-          '백업 위치: Documents/mysafetyreport/\n'
-          '(저장할 수 없으면 Download/mysafetyreport/)\n\n'
-          '계속하시겠습니까?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('전환'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    String? backupPath;
-    try {
-      if (Platform.isAndroid) {
-        final st = await Permission.storage.status;
-        if (!st.isGranted) await Permission.storage.request();
-      }
-      final dir = _backupDir();
-      final fileName =
-          'standalone_backup_${DateTime.now().millisecondsSinceEpoch}.db';
-      final target = File('${dir.path}/$fileName');
-      final srcPath = await LocalDbService.getDbPath();
-      if (File(srcPath).existsSync()) {
-        // 모드 전환은 사용자가 명시 요청 — 진행 중인 동기화·좌표 변환이 멈출 때까지 기다린 뒤 백업(M-25).
-        await LocalDbService.closeDb();
-        await LocalDbService.exportBackup(target.path);
-        backupPath = target.path;
-      }
-    } catch (e) {
-      // 백업 실패해도 모드 전환 자체는 진행 (사용자가 명시 요청)
-      if (mounted) {
-        showSrSnack(context, '백업 실패 (모드 전환은 진행): $e', kind: SrSnackKind.error);
-      }
-    }
-
-    if (!mounted) return;
-    await context.read<ReportProvider>().resetConfig();
-    if (mounted) {
-      if (backupPath != null) {
-        showSrSnack(
-          context,
-          '백업 완료: $backupPath',
-          kind: SrSnackKind.success,
-          duration: const Duration(seconds: 4),
-        );
-      }
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
-  }
-
-  /// Client → Standalone: 3-way 선택 (서버 DB 변환 / 백업 파일 선택 / 처음부터).
-  /// 선택 결과는 [PendingDbImportAction] 으로 직렬화돼 setup_screen 의
-  /// standalone 로그인 직후 [PendingDbImportAction.apply] 로 실행된다.
-  Future<void> _confirmServerToStandalone() async {
-    final p = context.read<ReportProvider>();
-
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Standalone 모드로 전환'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '기존 데이터를 어떻게 시작할지 선택해주세요.',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              _ChoiceTile(
-                icon: Icons.cloud_download,
-                title: '서버 DB 받아 변환',
-                subtitle:
-                    '현재 Client 서버에서 DB 를 받아 모바일 형식으로 변환.\n'
-                    '서버 데이터를 Standalone 에 그대로 가져옴.',
-                onTap: () => Navigator.pop(ctx, 'server'),
-              ),
-              const SizedBox(height: 8),
-              _ChoiceTile(
-                icon: Icons.folder_open,
-                title: '백업 파일 선택',
-                subtitle:
-                    '.db 파일을 직접 찾아 선택합니다.\n'
-                    '서버 live DB라면 같은 폴더의 -wal/-shm도 함께 반영합니다.',
-                onTap: () => Navigator.pop(ctx, 'pick_backup'),
-              ),
-              const SizedBox(height: 8),
-              _ChoiceTile(
-                icon: Icons.add_circle_outline,
-                title: '처음부터 시작',
-                subtitle: '빈 DB 로 시작. 로그인 후 첫 동기화로 안전신문고에서 모두 가져옴.',
-                onTap: () => Navigator.pop(ctx, 'fresh'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-        ],
-      ),
-    );
-
-    if (choice == null || !mounted) return;
-
-    PendingDbImportAction? pendingAction;
-
-    if (choice == 'server') {
-      // 서버 DB 다운로드 (지금) → Documents/mysafetyreport 에 저장 → pending action 으로 표기.
-      // 다운로드는 모드 reset 전에 (Client 자격증명 살아있을 때) 해야 함.
-      try {
-        if (Platform.isAndroid) {
-          final st = await Permission.storage.status;
-          if (!st.isGranted) await Permission.storage.request();
-        }
-      } catch (e) {
-        if (mounted) {
-          showSrSnack(context, '서버 DB 다운로드 실패: $e', kind: SrSnackKind.error);
-        }
-        return;
-      }
-      // 화면이 닫혔으면 다운로드·모드 전환을 시작하지 않는다.
-      if (!mounted) return;
-      // 진행 다이얼로그(받은 크기·취소). 뒤로가기도 취소로 처리하고(SQ-B06),
-      // 닫을 때는 이 route 만 닫는다 — Navigator.of(context).pop() 은 그 사이 맨 위가 바뀌면 설정 화면을 닫는다.
-      final cancel = DownloadCancel();
-      final progress = ValueNotifier<(int, int?)>((0, null));
-      // showDialog 와 같은 설정(루트 navigator·테마 캡처·배경색)으로 route 를 직접 만들어 그 route 만 닫을 수 있게 한다.
-      final dialogNavigator = Navigator.of(context, rootNavigator: true);
-      final dialogRoute = DialogRoute<void>(
-        context: context,
-        themes: InheritedTheme.capture(
-          from: context,
-          to: dialogNavigator.context,
-        ),
-        barrierColor:
-            DialogTheme.of(context).barrierColor ??
-            Theme.of(context).dialogTheme.barrierColor ??
-            Colors.black54,
-        barrierDismissible: false,
-        traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
-        builder: (ctx) => PopScope(
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) cancel.cancel();
-          },
-          child: AlertDialog(
-            content: ValueListenableBuilder<(int, int?)>(
-              valueListenable: progress,
-              builder: (_, v, _) => DbDownloadProgressView(
-                title: '서버 DB 다운로드 중',
-                received: v.$1,
-                total: v.$2,
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: cancel.cancel, child: const Text('취소')),
-            ],
-          ),
-        ),
-      );
-      unawaited(dialogNavigator.push(dialogRoute));
-      void closeDialog() {
-        if (!dialogRoute.isActive) return;
-        final navigator = dialogRoute.navigator;
-        if (navigator == null) return;
-        if (dialogRoute.isCurrent) {
-          navigator.pop();
-        } else {
-          navigator.removeRoute(dialogRoute);
-        }
-      }
-
-      try {
-        final api = ApiService(baseUrl: p.baseUrl, apiKey: p.apiKey);
-        final dir = _backupDir();
-        final fileName =
-            'server_db_${DateTime.now().millisecondsSinceEpoch}.db';
-        final target = File('${dir.path}/$fileName');
-        await api.downloadDbToFile(
-          target.path,
-          cancel: cancel,
-          onProgress: (received, total) => progress.value = (received, total),
-        );
-        pendingAction = ConvertServerDbAction(target.path);
-      } on DownloadCancelled {
-        if (mounted) {
-          showSrSnack(context, '서버 DB 다운로드를 취소했습니다. 모드는 바꾸지 않았습니다.');
-        }
-        return;
-      } catch (e) {
-        if (mounted) {
-          showSrSnack(context, '서버 DB 다운로드 실패: $e', kind: SrSnackKind.error);
-        }
-        return;
-      } finally {
-        closeDialog();
-        progress.dispose();
-      }
-    } else if (choice == 'pick_backup') {
-      try {
-        final result = await FilePicker.pickFiles(type: FileType.any);
-        if (result.isEmpty) return;
-        final selectedPath = await _stagePickedDbFiles(result);
-        if (selectedPath == null || selectedPath.isEmpty) return;
-        pendingAction = DetectAndApplyDbFileAction(selectedPath);
-      } catch (e) {
-        if (mounted) {
-          showSrSnack(context, '백업 파일 선택 실패: $e', kind: SrSnackKind.error);
-        }
-        return;
-      }
-    }
-    // 'fresh' 는 pendingAction = null
-
-    // 대기 작업 저장과 모드 초기화는 함께 하거나 둘 다 하지 않는다(SQ-B06). 다운로드·파일 선택 중 화면이
-    // 사라졌으면 여기서 멈춘다 — 대기 작업만 남으면 나중에 엉뚱한 Standalone 로그인에서 적용된다.
-    // 받은 파일은 지우지 않는다(사용자 자료).
-    if (!mounted) return;
-    await PendingDbImportAction.save(pendingAction);
-    await p.resetConfig();
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
@@ -1105,11 +837,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _themeModeDescription(AppThemeMode mode) {
     switch (mode) {
       case AppThemeMode.system:
-        return '기기의 라이트/다크 설정을 따라갑니다.';
+        return '기기 설정에 맞춤';
       case AppThemeMode.light:
-        return '항상 밝은 테마로 표시합니다.';
+        return '밝은 화면';
       case AppThemeMode.dark:
-        return '야간 환경에서 읽기 쉬운 다크 테마를 사용합니다.';
+        return '어두운 화면';
     }
   }
 
@@ -1132,77 +864,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final mutedColor = cs.onSurfaceVariant;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('앱 설정')),
+      appBar: AppBar(title: const Text('설정')),
       // 마지막 항목이 3버튼 내비·가로 컷아웃 아래로 들어가지 않게(SQ-U26).
       body: SingleChildScrollView(
-        padding: srPagePadding(context, const EdgeInsets.all(20)),
+        padding: srPagePadding(context, const EdgeInsets.all(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 순서(SQ-U17): 연결·계정(맨 위 도움·문의 포함) → 데이터 관리 → 표시 → 목록·통계 기준 → 권한 → 정보(앱 정보·홈페이지).
             const _SettingsSectionHeader(
               key: ValueKey('settings-section-connection'),
-              title: '연결·계정',
+              title: '계정',
             ),
-            // ── 연결 방식 카드 ─────────────────────────────
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isStandalone
-                          ? Icons.phone_android_rounded
-                          : Icons.dns_rounded,
-                      color: cs.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(
-                                isStandalone ? '직접 연결 (스탠드어론)' : 'Client 모드',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              ModeBadge(
-                                mode: provider.appMode,
-                                isDemo: provider.isStandaloneDemo,
-                              ),
-                            ],
-                          ),
-                          Text(
-                            isStandalone
-                                ? provider.standaloneUsername
-                                : provider.baseUrl.isEmpty
-                                ? '미설정'
-                                : provider.baseUrl,
-                            style: TextStyle(fontSize: 12, color: mutedColor),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _confirmModeReset,
-                      child: const Text('변경'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
             // ── 도움·문의 카드 ─────────────────────────────
             // 버그 제보 위치를 사용자가 자주 찾지 못해(2026-09-24 제보) 설정 맨 위(연결 방식 카드 바로 아래)에 둔다.
             // 버그 제보는 이 카드 한 곳에만 있다(SQ-U17: 앱 정보 카드의 중복 버튼 제거).
@@ -1243,7 +916,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1286,7 +959,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('재로그인 / 휴대폰번호 갱신'),
+                          label: const Text('로그인 정보 변경'),
                           onPressed: _showReloginDialog,
                         ),
                       ),
@@ -1401,7 +1074,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // ── 서버 연결 카드 ─────────────────────────────
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1461,9 +1134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       : Icons.visibility,
                                   size: 20,
                                 ),
-                                tooltip: _obscureKey
-                                    ? 'API 키 보기'
-                                    : 'API 키 숨기기',
+                                tooltip: _obscureKey ? 'API 키 보기' : 'API 키 숨기기',
                                 onPressed: () =>
                                     setState(() => _obscureKey = !_obscureKey),
                               ),
@@ -1550,7 +1221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1637,13 +1308,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ], // if (!isStandalone) WS service
             const SizedBox(height: 24),
             const _SettingsSectionHeader(
+              key: ValueKey('settings-section-sync'),
+              title: '동기화',
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.sync),
+                title: const Text('데이터 동기화'),
+                subtitle: const Text('진행 상태와 실행 기록'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => AppRoutes.openCrawl(context),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SettingsSectionHeader(
+              key: ValueKey('settings-section-permissions'),
+              title: '권한',
+            ),
+            Card(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(SrRadius.lg),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PermissionScreen()),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.security, color: cs.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '권한 설정',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: cs.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '알림·배터리·위치 권한',
+                              style: TextStyle(color: mutedColor, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: mutedColor),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SettingsSectionHeader(
+              key: ValueKey('settings-section-display'),
+              title: '표시',
+            ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.dark_mode_outlined, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '화면 테마',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // 라디오 3줄 + 설명 상자 대신 3칸 세그먼트 한 줄(SQ-U17).
+                    SegmentedButton<AppThemeMode>(
+                      key: const ValueKey('settings-theme-mode'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: AppThemeMode.system,
+                          label: Text('시스템'),
+                          tooltip: '시스템 설정 사용',
+                        ),
+                        ButtonSegment(
+                          value: AppThemeMode.light,
+                          label: Text('라이트'),
+                          tooltip: '라이트 모드',
+                        ),
+                        ButtonSegment(
+                          value: AppThemeMode.dark,
+                          label: Text('다크'),
+                          tooltip: '다크 모드',
+                        ),
+                      ],
+                      selected: {provider.themeMode},
+                      onSelectionChanged: (value) => context
+                          .read<ReportProvider>()
+                          .setThemeMode(value.first),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _themeModeDescription(provider.themeMode),
+                      style: TextStyle(color: mutedColor, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SettingsSectionHeader(
               key: ValueKey('settings-section-data'),
               title: '데이터 관리',
             ),
             // ── 데이터베이스 관리 ──────────────────────────────
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1678,13 +1470,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      '현재 기기(또는 서버)의 데이터를 파일로 백업합니다.\n${DbExportLocation.backupLocationHint}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: mutedColor,
-                        height: 1.5,
-                      ),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('백업 저장 위치'),
+                      childrenPadding: const EdgeInsets.only(bottom: 12),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '신고 데이터 백업\n${DbExportLocation.backupLocationHint}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: mutedColor,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
@@ -1720,7 +1522,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             )
                           : OutlinedButton.icon(
                               icon: const Icon(Icons.download, size: 18),
-                              label: const Text('DB 백업 (다운로드)'),
+                              label: const Text('DB 백업'),
                               onPressed: _backupDb,
                             ),
                     ),
@@ -1738,7 +1540,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             )
                           : OutlinedButton.icon(
                               icon: const Icon(Icons.upload, size: 18),
-                              label: const Text('DB 복원 (업로드)'),
+                              label: const Text('DB 복원'),
                               onPressed: _restoreDb,
                             ),
                     ),
@@ -1765,7 +1567,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // ── 크롤링 자동 저장 카드 ──────────────────────
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1842,76 +1644,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             const SizedBox(height: 24),
             const _SettingsSectionHeader(
-              key: ValueKey('settings-section-display'),
-              title: '표시',
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.dark_mode_outlined, color: cs.primary),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            '화면 테마',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // 라디오 3줄 + 설명 상자 대신 3칸 세그먼트 한 줄(SQ-U17).
-                    SegmentedButton<AppThemeMode>(
-                      key: const ValueKey('settings-theme-mode'),
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: AppThemeMode.system,
-                          label: Text('시스템'),
-                          tooltip: '시스템 설정 사용',
-                        ),
-                        ButtonSegment(
-                          value: AppThemeMode.light,
-                          label: Text('라이트'),
-                          tooltip: '라이트 모드',
-                        ),
-                        ButtonSegment(
-                          value: AppThemeMode.dark,
-                          label: Text('다크'),
-                          tooltip: '다크 모드',
-                        ),
-                      ],
-                      selected: {provider.themeMode},
-                      onSelectionChanged: (value) => context
-                          .read<ReportProvider>()
-                          .setThemeMode(value.first),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _themeModeDescription(provider.themeMode),
-                      style: TextStyle(color: mutedColor, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const _SettingsSectionHeader(
               key: ValueKey('settings-section-list-basis'),
               title: '목록·통계 기준',
             ),
             // ── 목록·통계 기준 카드 (양쪽 모드 공통, 옛 이름 "기타 데이터 필터 세팅") ──────
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1954,7 +1693,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(fontSize: 14),
                       ),
                       subtitle: const Text(
-                        '처리상태가 취하인 신고를 목록에서 제외합니다.',
+                        '취하 신고 숨기기',
                         style: TextStyle(fontSize: 12),
                       ),
                       value: _excludeWithdraw,
@@ -1972,7 +1711,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(fontSize: 14),
                       ),
                       subtitle: const Text(
-                        '전체 신고 조회, 차량/주소 검색, 대시보드, 통계 등의 기본 집계 기준을 대표건 1건으로 맞춥니다.\n비활성화할 경우 원본 신고 row를 모두 반영합니다. 검토 필요 그룹은 항상 child 전체를 보여줍니다.',
+                        '목록·검색·통계에 대표 신고만 반영합니다. 끄면 원본 전체를 반영하며, 검토 필요 그룹은 항상 전체를 표시합니다.',
                         style: TextStyle(fontSize: 12),
                       ),
                       value: _useRepresentativeRecords,
@@ -1989,57 +1728,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
             const _SettingsSectionHeader(
-              key: ValueKey('settings-section-permissions'),
-              title: '권한',
-            ),
-            Card(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(SrRadius.lg),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PermissionScreen()),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Icon(Icons.security, color: cs.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '권한 설정',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: cs.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '알림 접근, 배터리 최적화 제외, 백그라운드 서비스 등 권한을 관리합니다.',
-                              style: TextStyle(color: mutedColor, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right, color: mutedColor),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const _SettingsSectionHeader(
               key: ValueKey('settings-section-about'),
               title: '정보',
             ),
             // ── 앱 정보 카드 ──────────────────────────────
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2084,7 +1779,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.open_in_browser, size: 18),
-                        label: const Text('안전신문고 공식 사이트 열기'),
+                        label: const Text('공식 사이트 열기'),
                         onPressed: _openOfficialSource,
                       ),
                     ),
@@ -2103,7 +1798,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '이 앱은 안전신문고의 공식 앱이 아니며 행정안전부 또는 정부기관을 대표하지 않습니다.',
+                            '안전신문고 비공식 앱이며 정부기관을 대표하지 않습니다.',
                             style: TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
@@ -2112,7 +1807,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '안전신문고 데이터를 사용자의 편의를 위해 조회·정리해 보여주는 비공식 도구입니다.',
+                            '접수된 신고의 조회·관리 도구입니다.',
                             style: TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
@@ -2121,7 +1816,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '원문 확인과 실제 민원 처리는 안전신문고 공식 서비스에서 진행해 주세요.',
+                            '원문 확인·민원 처리는 공식 안전신문고에서 진행해 주세요.',
                             style: TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
@@ -2148,7 +1843,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.language, size: 18),
-                label: const Text('홈페이지 바로가기'),
+                label: const Text('홈페이지'),
                 onPressed: () async {
                   final url = Uri.parse(SupportLinks.userGuide);
                   await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -2250,9 +1945,9 @@ class _SettingsSectionHeader extends StatelessWidget {
       header: true,
       child: Text(
         title,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w700,
-          color: context.sr.textSecondary,
+          color: context.sr.textPrimary,
         ),
       ),
     ),
@@ -2260,63 +1955,6 @@ class _SettingsSectionHeader extends StatelessWidget {
 }
 
 /// Server → Standalone 전환 시 3-way 선택 다이얼로그용 타일.
-class _ChoiceTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  const _ChoiceTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(SrRadius.lg),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: cs.primary.withValues(alpha: 0.4)),
-          borderRadius: BorderRadius.circular(SrRadius.lg),
-          color: cs.primary.withValues(alpha: 0.04),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: cs.primary, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: SrFontSize.caption,
-                      color: cs.onSurfaceVariant,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 설정 맨 위 도움·문의 카드. 버그 제보는 설정에서 이 카드 한 곳에만 있다(2026-09-24 결정, SQ-U17).
 class _SupportCard extends StatelessWidget {
   final VoidCallback onBugReport;
   final VoidCallback onFeatureRequest;
@@ -2335,7 +1973,7 @@ class _SupportCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -2357,12 +1995,12 @@ class _SupportCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '앱이 이상하게 동작하면 알려 주세요. 앱 버전·모드가 미리 채워진 제보 양식이 열립니다.',
+              '앱 정보가 포함된 제보 양식',
               style: TextStyle(fontSize: 13, height: 1.45, color: cs.onSurface),
             ),
             const SizedBox(height: 4),
             Text(
-              'GitHub 계정이 필요하고, 제보는 공개됩니다. 아이디·API 키·차량번호 같은 개인정보는 적지 마세요.',
+              'GitHub 로그인 필요 · 공개 제보입니다. 계정·인증 키·차량번호는 적지 마세요.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.45,
@@ -2372,33 +2010,31 @@ class _SupportCard extends StatelessWidget {
             const SizedBox(height: 12),
             FilledButton.tonalIcon(
               icon: const Icon(Icons.bug_report_outlined),
-              label: const Text('버그 제보하기'),
+              label: const Text('버그 제보'),
               onPressed: onBugReport,
             ),
             const SizedBox(height: 8),
-            Row(
+            OverflowBar(
+              spacing: 8,
+              overflowSpacing: 8,
+              alignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.lightbulb_outline, size: 18),
-                    label: const Text('기능 요청'),
-                    onPressed: onFeatureRequest,
-                  ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.lightbulb_outline, size: 18),
+                  label: const Text('기능 요청'),
+                  onPressed: onFeatureRequest,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.menu_book_outlined, size: 18),
-                    label: const Text('사용 가이드'),
-                    onPressed: onGuide,
-                  ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.menu_book_outlined, size: 18),
+                  label: const Text('사용 가이드'),
+                  onPressed: onGuide,
                 ),
               ],
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.star_outline, size: 18),
-              label: const Text('Play 스토어에서 평가하기'),
+              label: const Text('Play 스토어 평가'),
               onPressed: onRateApp,
             ),
           ],

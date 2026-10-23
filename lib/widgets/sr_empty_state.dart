@@ -65,10 +65,17 @@ class SrEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 56,
-            color: isError ? tone.foreground : sr.textDisabled,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isError ? tone.background : sr.surfaceAlt,
+              borderRadius: BorderRadius.circular(SrRadius.xl),
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: isError ? tone.foreground : sr.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           Text(

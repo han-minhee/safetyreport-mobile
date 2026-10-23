@@ -297,7 +297,7 @@ class _CommunityRebuildScreenState extends State<CommunityRebuildScreen>
       return Scaffold(
         appBar: AppBar(title: const Text('서버 권한 확인')),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -324,7 +324,7 @@ class _CommunityRebuildScreenState extends State<CommunityRebuildScreen>
     return Scaffold(
       appBar: AppBar(title: const Text('신고 내역 다시 불러오기')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -690,7 +690,7 @@ class StandaloneRebuildGuideScreen extends StatelessWidget {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

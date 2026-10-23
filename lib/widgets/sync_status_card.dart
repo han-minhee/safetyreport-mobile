@@ -39,7 +39,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
 
   static String _format(String? iso) {
     final t = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
-    if (t == null) return '아직 동기화 기록이 없습니다';
+    if (t == null) return '동기화 기록 없음';
     String two(int v) => v.toString().padLeft(2, '0');
     return '마지막 동기화 ${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
   }
@@ -65,31 +65,14 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
     final title = isStandalone ? '동기화' : '크롤링';
     // 글꼴 1.5배 이상이면 이동 버튼을 설명 아래로 내린다(제목·버튼이 한 줄에 들어가지 않는다).
     final large = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
-    final action = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            '$title 화면',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: scheme.primary,
-            ),
-          ),
-        ),
-        Icon(Icons.chevron_right, color: scheme.primary),
-      ],
-    );
+    final action = Icon(Icons.chevron_right, color: sr.textSecondary);
 
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(SrRadius.lg),
         onTap: () => AppRoutes.openCrawl(context),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
@@ -124,18 +107,15 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                       children: [
                         Expanded(
                           child: Text(
-                            '$title 상태',
+                            title,
                             style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                               color: sr.textPrimary,
                             ),
                           ),
                         ),
-                        if (!large) ...[
-                          const SizedBox(width: 8),
-                          Flexible(child: action),
-                        ],
+                        if (!large) ...[const SizedBox(width: 8), action],
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -146,14 +126,14 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                       )
                     else if (!isStandalone)
                       Text(
-                        '서버 크롤링 실행·상태·로그는 크롤링 화면에서 확인합니다',
+                        '실행 내역과 로그 확인',
                         maxLines: large ? 4 : 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: sr.textSecondary),
                       )
                     else if (p.isStandaloneDemo)
                       Text(
-                        '데모 모드에서는 동기화를 실행할 수 없습니다',
+                        '데모에서는 동기화할 수 없습니다',
                         style: TextStyle(fontSize: 12, color: sr.textSecondary),
                       )
                     else
@@ -208,10 +188,12 @@ class _SyncActionButtonState extends State<SyncActionButton>
         .select<ReportProvider, ({AppMode appMode, bool isSyncing})>(
           (p) => (appMode: p.appMode, isSyncing: p.isSyncing),
         );
-    if (p.isSyncing) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (p.isSyncing && !reduceMotion) {
       if (!_controller.isAnimating) _controller.repeat();
     } else if (_controller.isAnimating) {
       _controller.stop();
+      _controller.value = 0;
     }
     final label = p.appMode == AppMode.standalone ? '동기화' : '크롤링';
     return IconButton(

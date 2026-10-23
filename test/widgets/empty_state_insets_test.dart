@@ -210,7 +210,7 @@ void main() {
         const Offset(0, -30000),
       );
       await tester.pumpAndSettle();
-      final last = tester.getRect(find.text('홈페이지 바로가기'));
+      final last = tester.getRect(find.text('홈페이지'));
       expect(last.bottom, lessThanOrEqualTo(800 - 48), reason: '내비 바 위');
       final firstCard = tester.getRect(find.byType(Card).last);
       expect(firstCard.left, greaterThanOrEqualTo(48), reason: '컷아웃 오른쪽');
@@ -249,7 +249,7 @@ void main() {
       await tester.pumpWidget(_app(p, const DashboardScreen()));
       await tester.pump();
       final body = find.descendant(
-        of: find.byType(SingleChildScrollView).first,
+        of: find.byType(ListView).first,
         matching: find.byType(Card),
       );
       expect(body, findsWidgets);

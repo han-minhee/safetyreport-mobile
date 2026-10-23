@@ -27,13 +27,13 @@ class SrTabBar extends StatelessWidget implements PreferredSizeWidget {
   final TextScaler textScaler;
 
   static const double baseHeight = 48;
-  static const double _labelFontSize = 13.5;
+  static const double _labelFontSize = 14;
   static const double _badgeFontSize = SrFontSize.caption;
   static const EdgeInsets _barPadding = EdgeInsets.fromLTRB(12, 0, 12, 0);
 
   /// 알약 아래 여백. 예전에는 막대 바깥 여백이라 탭을 누르는 영역이 42dp 였다.
   /// 이제 탭 안쪽(글자 여백·알약 여백)에 두어 보이는 모양은 같고 누르는 영역은 막대 높이(48dp 이상)다(SQ-U20).
-  static const double _tabBottomGap = 6;
+  static const double _tabBottomGap = 0;
   static const double _indicatorWeight = 2;
 
   /// 글자 배율에 맞춘 탭 막대 높이. 1.0배는 기존 48 그대로다.
@@ -168,23 +168,21 @@ class SrTabBar extends StatelessWidget implements PreferredSizeWidget {
               break;
             }
           }
-          return TabBar(
-            controller: controller,
-            tabs: [
-              for (var i = 0; i < labels.length; i++)
-                _tab(context, i, tabHeight),
-            ],
-            isScrollable: !fits,
-            tabAlignment: fits ? null : TabAlignment.start,
-            padding: _barPadding,
-            labelPadding: labelPadding.add(
-              const EdgeInsets.only(bottom: _tabBottomGap),
-            ),
-            indicatorPadding: const EdgeInsets.fromLTRB(
-              0,
-              4,
-              0,
-              4 + _tabBottomGap,
+          return Material(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: TabBar(
+              controller: controller,
+              tabs: [
+                for (var i = 0; i < labels.length; i++)
+                  _tab(context, i, tabHeight),
+              ],
+              isScrollable: !fits,
+              tabAlignment: fits ? null : TabAlignment.start,
+              padding: _barPadding,
+              labelPadding: labelPadding.add(
+                const EdgeInsets.only(bottom: _tabBottomGap),
+              ),
+              indicatorPadding: EdgeInsets.zero,
             ),
           );
         },

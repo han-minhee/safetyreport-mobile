@@ -106,52 +106,17 @@ void main() {
   http.Response ok(Object data) =>
       http.Response(jsonEncode({'data': data}), 200);
 
-  testWidgets(
-    'SQ-B06 back on the server DB download dialog cancels the download and '
-    'keeps the settings screen and mode',
-    (tester) async {
-      final release = Completer<void>();
-      var dbRequests = 0;
-      await http.runWithClient(
-        () async {
-          final provider = await pumpSettings(tester);
-          addTearDown(provider.dispose);
-
-          await tester.ensureVisible(find.text('변경'));
-          await tester.tap(find.text('변경'));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('서버 DB 받아 변환'));
-          await settle(tester);
-          expect(find.textContaining('서버 DB 다운로드 중'), findsOneWidget);
-          expect(dbRequests, 1);
-
-          // Android 뒤로가기
-          await tester.binding.handlePopRoute();
-          if (!release.isCompleted) release.complete();
-          await settle(tester);
-
-          expect(find.textContaining('서버 DB 다운로드 중'), findsNothing);
-          expect(
-            find.byType(SettingsScreen),
-            findsOneWidget,
-            reason: '진행 창 닫기용 pop 이 설정 화면을 닫으면 안 된다',
-          );
-          expect(find.textContaining('취소했습니다'), findsOneWidget);
-          expect(provider.resetCalls, 0, reason: '모드는 바꾸지 않는다');
-          final prefs = await SharedPreferences.getInstance();
-          expect(prefs.getString(AppPrefsKeys.pendingDbImport), isNull);
-        },
-        () => selfhostMockClient((request) async {
-          if (request.url.path == ServerContract.settingsDbPath) {
-            dbRequests++;
-            await release.future;
-            throw http.ClientException('closed');
-          }
-          return ok(<String, Object>{'total': 1});
-        }),
-      );
-    },
-  );
+  testWidgets('legacy settings no longer offers mode-switch download', (
+    tester,
+  ) async {
+    await http.runWithClient(() async {
+      final provider = await pumpSettings(tester);
+      addTearDown(provider.dispose);
+      expect(find.text('변경'), findsNothing);
+      expect(find.text('서버 DB 받아 변환'), findsNothing);
+      expect(provider.resetCalls, 0);
+    }, () => selfhostMockClient((_) async => ok(<String, Object>{'total': 1})));
+  });
 
   testWidgets('SQ-B08 save cannot run twice while saving', (tester) async {
     final release = Completer<void>();

@@ -46,11 +46,15 @@ class ReportListScreen extends StatefulWidget {
   /// 드릴다운 제목(예: "예시 교통 담당 기관 · 신고"). 조건을 바꾸면 기본 제목으로 돌아간다.
   final String? title;
 
+  /// Workspace switch below the single Reports page header.
+  final PreferredSizeWidget? workspaceNavigation;
+
   const ReportListScreen({
     super.key,
     this.initialTabIndex = 0,
     this.filter,
     this.title,
+    this.workspaceNavigation,
   });
 
   @override
@@ -280,7 +284,7 @@ class _ReportListScreenState extends State<ReportListScreen>
                 ],
               )
             : AppBar(
-                title: Text(title),
+                title: Text(widget.workspaceNavigation != null ? '신고' : title),
                 actions: [
                   if (countText != null)
                     Padding(
@@ -316,11 +320,30 @@ class _ReportListScreenState extends State<ReportListScreen>
                   ),
                   const SettingsActionButton(),
                 ],
-                bottom: SrTabBar(
-                  controller: _tabController,
-                  textScaler: MediaQuery.textScalerOf(context),
-                  // SrTabBar 가 폭에 안 맞으면 스스로 가로 스크롤로 바꾼다(360dp·2배 글자 포함).
-                  labels: const ['교통위반', '주정차', '안전신고', '생활불편', '기타', '중복차량'],
+                bottom: PreferredSize(
+                  preferredSize: Size.fromHeight(
+                    (widget.workspaceNavigation?.preferredSize.height ?? 0) +
+                        SrTabBar.heightFor(MediaQuery.textScalerOf(context)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.workspaceNavigation != null)
+                        widget.workspaceNavigation!,
+                      SrTabBar(
+                        controller: _tabController,
+                        textScaler: MediaQuery.textScalerOf(context),
+                        labels: const [
+                          '교통위반',
+                          '주정차',
+                          '안전신고',
+                          '생활불편',
+                          '기타',
+                          '중복차량',
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
         body: Stack(

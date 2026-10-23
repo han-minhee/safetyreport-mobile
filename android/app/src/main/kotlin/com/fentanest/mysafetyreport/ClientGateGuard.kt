@@ -5,20 +5,12 @@ import org.json.JSONObject
 
 /** Flutter의 최신 카카오 인증·동의 게이트 결과가 열려 있을 때만 Client 서버 작업을 시작한다. */
 object ClientGateGuard {
-    fun isOpen(prefs: SharedPreferences): Boolean = try {
-        JSONObject(prefs.getString("flutter.community_gate_cache_v1", "") ?: "")
-            .let { cache ->
-                val age = System.currentTimeMillis() - cache.optLong("verified_at", -1L)
-                cache.optString("state") == "ok" && age >= 0 && age <= 600_000
-            }
-    } catch (_: Exception) {
-        false
-    }
+    // Standalone-only distribution: reject legacy server work, even before Flutter migrates preferences.
+    @Suppress("UNUSED_PARAMETER")
+    fun isOpen(prefs: SharedPreferences): Boolean = false
 
-    fun canRenew(prefs: SharedPreferences): Boolean = try {
-        val cache = JSONObject(prefs.getString("flutter.community_gate_cache_v1", "") ?: "")
-        cache.optString("state") == "ok" && cache.optString("owner").isNotBlank()
-    } catch (_: Exception) { false }
+    @Suppress("UNUSED_PARAMETER")
+    fun canRenew(prefs: SharedPreferences): Boolean = false
 
     fun configStamp(prefs: SharedPreferences): String {
         val raw = listOf("flutter.appMode", "flutter.baseUrl", "flutter.apiKey", "flutter.standaloneUsername", "flutter.native_config_generation")

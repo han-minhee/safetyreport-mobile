@@ -1,3 +1,4 @@
+import '../widgets/sr_surface.dart';
 import '../services/performance_trace.dart';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import '../server_palette.dart';
 import '../services/report_policy.dart';
 import '../widgets/auth_status_notice.dart';
 import '../widgets/report_detail_sheet.dart';
-import '../widgets/report_list_card.dart' show fineEstimateSuffix;
+import '../widgets/report_list_card.dart';
 import '../services/fine_estimate.dart' as fine_estimate;
 import 'recent_answers_screen.dart';
 import 'report_management_screen.dart';
@@ -28,7 +29,8 @@ import '../utils/format.dart';
 import '../theme/sr_tokens.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.overview = false});
+  final bool overview;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -39,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final provider = context.read<ReportProvider>();
       await provider.fetchSummary();
     });
@@ -78,7 +81,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 constraints: BoxConstraints(
                   maxWidth: constraints.maxWidth * 0.6,
                 ),
-                child: const Text('대시보드', overflow: TextOverflow.ellipsis),
+                child: Text(
+                  widget.overview ? '처리 현황' : '홈',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 8),
               Flexible(
@@ -95,7 +101,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         // 탭별 동작은 왼쪽, 설정은 항상 맨 끝(SQ-U16).
-        actions: const [SyncActionButton(), SettingsActionButton()],
+        actions: [
+          if (widget.overview) const SyncActionButton(),
+          const SettingsActionButton(),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: provider.refreshSummaryAndRecentAnswers,
@@ -198,6 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ReportProvider provider,
     DashboardStats stats,
   ) {
+    if (!widget.overview) return _buildHome(context, provider, stats);
     final trafficTotal =
         stats.tFineCount +
         stats.tPenaltyCount +
@@ -216,7 +226,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _buildSummaryGrid(stats),
           const SizedBox(height: 12),
           const SyncStatusCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+          _buildRecentSection(context, provider.recentAnswerReports),
+          const SizedBox(height: 24),
           if (trafficTotal > 0) ...[
             _buildTrafficCard(stats),
             const SizedBox(height: 16),
@@ -228,13 +240,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
             stats.watchlist,
             stats.watchlistTotal,
           ),
-          const SizedBox(height: 16),
-          _buildRecentSection(context, provider.recentAnswerReports),
+
           // 전국 신고현황(Sunwi)은 2026-09-28 통계 탭 아래로 옮겼다.
         ],
       ),
     );
   }
+
+  Widget _buildHome(
+    BuildContext context,
+    ReportProvider provider,
+    DashboardStats stats,
+  ) {
+    return ListView(
+      padding: srPagePadding(context, const EdgeInsets.all(16)),
+      children: [
+        const ReloginRequiredBanner(),
+        const RebuildProgressCard(),
+        Text('확인할 소식', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        Text(
+          '보완 ${stats.supplementCount}건 · 처리 중 ${stats.processingCount}건',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 24),
+        const SyncStatusCard(),
+        const SizedBox(height: 12),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.assignment_late_outlined),
+                title: const Text('보완 요청'),
+                subtitle: Text('${formatCount(stats.supplementCount)}건'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: stats.supplementCount == 0
+                    ? null
+                    : () => _openFiltered(
+                        '보완 요청',
+                        (r) =>
+                            ReportPolicy.norm(r.status) ==
+                            ReportPolicy.supplementStatus,
+                      ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text('신고 내역'),
+                subtitle: Text('전체 ${formatCount(stats.total)}건'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () =>
+                    MainTabScope.maybeOf(context)?.goTo(MainTabs.reports),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildRecentSection(context, provider.recentAnswerReports),
+        const SrSectionHeader(title: '처리 현황'),
+        Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: const Icon(Icons.insights_outlined),
+            title: Text('수용 ${formatCount(stats.acceptCount)}건'),
+            subtitle: Text(
+              '처리 중 ${formatCount(stats.processingCount)}건 · 답변 완료 ${formatCount(stats.completedCount)}건',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _openOverview(context),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () =>
+                MainTabScope.maybeOf(context)?.goTo(MainTabs.statistics),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('통계 보기'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildWatchlistSection(context, stats.watchlist, stats.watchlistTotal),
+      ],
+    );
+  }
+
+  void _openOverview(BuildContext context) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => const DashboardScreen(overview: true),
+    ),
+  );
 
   // ── 처리 상태 요약 ─────────────────────────────────
   // 전체 건수를 머리 한 줄에 두고 상태 6종을 칸으로 둔다(SQ-U15). 칸 높이는 내용 높이를 따른다
@@ -449,7 +544,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final enabled = d.value > 0;
     final sr = context.sr;
     // 0건 칸: 배치는 같고, 바탕은 중립 면·글자는 흐리게, 누를 수 없음.
-    final fg = enabled ? tone.foreground : sr.textSecondary;
+    final fg = enabled ? sr.textPrimary : sr.textSecondary;
     return Semantics(
       button: enabled,
       enabled: enabled,
@@ -458,10 +553,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       excludeSemantics: true,
       child: Material(
         key: ValueKey('dashboard-status-${d.label}'),
-        color: enabled ? tone.background : sr.surfaceAlt,
+        color: enabled ? sr.surface : sr.surfaceAlt,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SrRadius.lg),
-          side: BorderSide(color: enabled ? tone.border : sr.border),
+          side: BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -893,7 +988,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         if (allCount > shown)
           Text(
-            '전체 ${formatCount(allCount)} · 최근 ${formatCount(shown)} 표시 (관리에서 전체 조회)',
+            '전체 ${formatCount(allCount)} · 최근 ${formatCount(shown)}',
             style: TextStyle(fontSize: 12, color: context.sr.textSecondary),
           ),
         const SizedBox(height: 8),
@@ -1032,7 +1127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 6),
             const Expanded(
               child: Text(
-                '최근 답변 완료 (3일)',
+                '최근 답변 · 3일',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -1042,7 +1137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: const Text('모두 보기'),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 28),
+                  minimumSize: const Size(48, 48),
                 ),
                 onPressed: () => Navigator.push(
                   context,
@@ -1059,7 +1154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(
-                '3일 내 답변 완료된 신고가 없습니다.',
+                '최근 3일간 새 답변이 없습니다.',
                 style: TextStyle(color: context.sr.textSecondary),
               ),
             ),
@@ -1082,125 +1177,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildRecentCard(Report r) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(SrRadius.lg),
-          onTap: () => showReportDetailSheet(context, r),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        r.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _statusChip(r.status),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (r.reportNumber.isNotEmpty)
-                  _metaRow(Icons.tag, '신고번호', r.reportNumber),
-                if (r.date.isNotEmpty)
-                  _metaRow(Icons.calendar_today, '신고일', r.date),
-                if (r.responseDate.isNotEmpty)
-                  _metaRow(Icons.check_circle_outline, '답변일', r.responseDate),
-                if (r.agency.isNotEmpty)
-                  _metaRow(Icons.business, '처리기관', r.agency),
-                if (r.manager.isNotEmpty)
-                  _metaRow(Icons.person_outline, '담당자', r.manager),
-                if (r.fineInfo.isNotEmpty)
-                  _metaRow(
-                    Icons.monetization_on_outlined,
-                    '과태료/범칙금',
-                    fine_estimate.fineTextForReport(r),
-                    secondary: fineEstimateSuffix(r),
-                  ),
-                if (r.carNumber.isNotEmpty)
-                  _metaRow(Icons.directions_car_outlined, '차량번호', r.carNumber),
-              ],
-            ),
-          ),
+  Widget _buildRecentCard(Report r) => ReportListCard(
+    report: r,
+    selectionMode: false,
+    isSelected: false,
+    onTap: () => showReportDetailSheet(context, r),
+    onLongPress: () => showReportDetailSheet(context, r),
+    metaItems: [
+      if (r.responseDate.isNotEmpty)
+        ReportCardMetaItem(
+          icon: Icons.check_circle_outline,
+          text: '답변 ${r.responseDate}',
         ),
-      ),
-    );
-  }
-
-  Widget _metaRow(
-    IconData icon,
-    String label,
-    String value, {
-    String? secondary,
-  }) {
-    final hasSecondary = secondary != null && secondary.isNotEmpty;
-    final valueText = hasSecondary
-        ? Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: value),
-                TextSpan(
-                  text: ' $secondary',
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: context.sr.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            style: const TextStyle(fontSize: SrFontSize.caption),
-            overflow: TextOverflow.ellipsis,
-          )
-        : Text(
-            value,
-            style: const TextStyle(fontSize: SrFontSize.caption),
-            overflow: TextOverflow.ellipsis,
-          );
-    final row = Padding(
-      padding: const EdgeInsets.only(top: 3),
-      child: Row(
-        children: [
-          Icon(icon, size: 12, color: context.sr.textSecondary),
-          const SizedBox(width: 4),
-          Text(
-            '$label ',
-            style: TextStyle(
-              fontSize: SrFontSize.caption,
-              color: context.sr.textSecondary,
-            ),
-          ),
-          Expanded(child: valueText),
-        ],
-      ),
-    );
-    if (!hasSecondary) return row;
-    return Semantics(
-      label: '$label $value, 추정 금액 ${secondary.replaceFirst('추정 ', '')}',
-      excludeSemantics: true,
-      child: row,
-    );
-  }
-
-  Widget _statusChip(String status) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 110),
-      child: StatusBadge.status(status),
-    );
-  }
+      if (r.agency.isNotEmpty)
+        ReportCardMetaItem(icon: Icons.business, text: r.agency),
+      if (r.fineInfo.isNotEmpty) ReportCardMetaItem.fine(r),
+    ],
+  );
 }
 
 /// 대시보드 상태 칸 하나(라벨·건수·기준색·아이콘·드릴다운 필터).
